@@ -26,6 +26,11 @@ except ImportError as e:
     sys.exit(1)
 
 import numpy as np
+import matplotlib.pyplot as plt
+import pylab
+import pygraphviz
+from networkx.drawing.nx_agraph import graphviz_layout
+from networkx.drawing.nx_agraph import write_dot
 
 def myFunc(row):
     #parse line
@@ -55,16 +60,32 @@ def myFunc(row):
 
 conf = SparkConf().setAppName('PyTest').setMaster('local')
 sc = SparkContext(conf=conf)
-lines = sc.textFile("/home/kkrasnas/Documents/thesis/pattern_mining/tables/rules_clean.csv")
+lines = sc.textFile("/home/kkrasnas/Documents/thesis/pattern_mining/tables/rules_sample.csv")
 
 #map: key - graph hash, value - graph itself
 hashedGraphs = lines.map(lambda row: myFunc(row) )
 grouping = hashedGraphs.reduceByKey(lambda a, b: GraphCount(a.graph, a.count + b.count))
-#all_graphs = grouping.collect()
-#example = all_graphs[0]
-#convert to networkx graph
-#G = nx.Graph()
+all_graphs = grouping.collect()
+#for gr in all_graphs:
+ #   print gr[0], gr[1].count
+i = 0
+for example in all_graphs:
 
-grouping.saveAsTextFile('/home/kkrasnas/Documents/thesis/pattern_mining/tables/test_res_full6.out')
+    #convert to networkx graph
+    print (i,example[1].graph)
+    nx_g = nx.MultiGraph()
+    nx_g.add_nodes_from(example[1].graph._get_adjacency_dict().iterkeys())
+    for key in example[1].graph._get_adjacency_dict().iterkeys():
+        for val in example[1].graph._get_adjacency_dict()[key]:
+            nx_g.add_edge(key,val)
+    plt.figure(i)
+    #nx.draw_circular(nx_g, with_labels=False, node_color='blue')
+    pos = graphviz_layout(nx_g)
+    nx.draw(nx_g, pos)
+    i += 1
+plt.interactive(False)
+plt.show()
+
+#grouping.saveAsTextFile('/home/kkrasnas/Documents/thesis/pattern_mining/tables/test_res_full6.out')
 
 

@@ -36,9 +36,9 @@ except ImportError as e:
 
 
 
-def map_freq_itemsets(row, size):
+def map_freq_itemsets(row):
     #parse line
-    rule = ARule(row, True, )
+    rule = ARule(row)
     #print rule
     full_vertices = rule.conseq.split('.') if rule.conseq != None else []
     full_set = set(map(int, full_vertices))
@@ -60,18 +60,15 @@ def map_freq_itemsets(row, size):
             g.connect_vertex(full_set.index(edge[0]), full_set.index(edge[1]))
     cert = certificate(g)
     #print (row['1:nrow(p3)'], full_set, cert)
-    return (cert, FIGraphCount(g, count=1, sup_abs=rule.support_abs))
+    return (cert, FIGraphCount(g, 1))
 
-def add_support(val, n):
-    val[1].support_rel = float(val[1].support_abs) / float(n)
-    return val
 
 def draw_graphs(all_graphs):
     i = 0
     for example in all_graphs:
 
         #convert to networkx graph
-        print (i,example[1].fi_graph)
+        print (i,example[1].graph)
         nx_g = nx.MultiGraph()
         nx_g.add_nodes_from(example[1].graph._get_adjacency_dict().iterkeys())
         for key in example[1].graph._get_adjacency_dict().iterkeys():
@@ -89,24 +86,17 @@ def draw_graphs(all_graphs):
 
 conf = SparkConf().setAppName('FrequentShapes').setMaster('local')
 sc = SparkContext(conf=conf)
-lines = sc.textFile("/home/kkrasnas/Documents/thesis/pattern_mining/tables/rules_sample.csv")
-#map: key - graph hash, value - graph itself + count + support
-size = 1980
-hashedGraphs = lines.map(lambda row: map_freq_itemsets(row, size=size))
-group_by_shapes = hashedGraphs.reduceByKey(lambda a, b: FIGraphCount(a.fi_graph, a.count + b.count, a.support_abs + b.support_abs))
+lines = sc.textFile("/home/kkrasnas/Documents/thesis/pattern_mining/tables/rules_clean.csv")
 
-
-fi_with_support = group_by_shapes.map(lambda val: add_support(val, size))
-
-all_graphs = fi_with_support.collect()
-sum = 0
-for gr in all_graphs:
-    print gr[0], gr[1].count, gr[1].support_abs, gr[1].support_rel
-    sum += gr[1].count
-print sum
+#map: key - graph hash, value - graph itself
+hashedGraphs = lines.map(lambda row: map_freq_itemsets(row))
+grouping = hashedGraphs.reduceByKey(lambda a, b: FIGraphCount(a.graph, a.count + b.count))
+all_graphs = grouping.collect()
+#for gr in all_graphs:
+ #   print gr[0], gr[1].count
 #draw_graphs(all_graphs)
 
-#fi_with_support.saveAsTextFile('/home/kkrasnas/Documents/thesis/pattern_mining/tables/test_res_sup1.out')
+#grouping.saveAsTextFile('/home/kkrasnas/Documents/thesis/pattern_mining/tables/test_res_full7.out')
 
 
 

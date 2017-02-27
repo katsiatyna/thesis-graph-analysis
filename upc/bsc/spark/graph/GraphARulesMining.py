@@ -7,7 +7,7 @@ from pynauty import *
 import re
 import networkx as nx
 from model.ARule import *
-from model.FIGraphCount import *
+from model.FIGraph import *
 import matplotlib.pyplot as plt
 import pylab
 import pydot
@@ -36,7 +36,7 @@ except ImportError as e:
 
 
 
-def map_freq_itemsets(row):
+def map_arules(row):
     #parse line
     rule = ARule(row)
     #print rule
@@ -60,7 +60,7 @@ def map_freq_itemsets(row):
             g.connect_vertex(full_set.index(edge[0]), full_set.index(edge[1]))
     cert = certificate(g)
     #print (row['1:nrow(p3)'], full_set, cert)
-    return (cert, FIGraphCount(g, 1))
+    return (cert, FIGraph(g, 1))
 
 
 def draw_graphs(all_graphs):
@@ -84,13 +84,13 @@ def draw_graphs(all_graphs):
     #plt.show()
 
 
-conf = SparkConf().setAppName('FrequentShapes').setMaster('local')
+conf = SparkConf().setAppName('ARuleShapes').setMaster('local')
 sc = SparkContext(conf=conf)
 lines = sc.textFile("/home/kkrasnas/Documents/thesis/pattern_mining/tables/rules_clean.csv")
 
 #map: key - graph hash, value - graph itself
-hashedGraphs = lines.map(lambda row: map_freq_itemsets(row))
-grouping = hashedGraphs.reduceByKey(lambda a, b: FIGraphCount(a.graph, a.count + b.count))
+hashedGraphs = lines.map(lambda row: map_arules(row))
+grouping = hashedGraphs.reduceByKey(lambda a, b: FIGraph(a.graph, a.count + b.count))
 all_graphs = grouping.collect()
 #for gr in all_graphs:
  #   print gr[0], gr[1].count

@@ -7,7 +7,7 @@ from pynauty import *
 import re
 import networkx as nx
 from model.ARule import *
-from model.FIGraphCount import *
+from model.FIGraph import *
 import matplotlib.pyplot as plt
 import pylab
 import pydot
@@ -60,7 +60,7 @@ def map_freq_itemsets(row, size):
             g.connect_vertex(full_set.index(edge[0]), full_set.index(edge[1]))
     cert = certificate(g)
     #print (row['1:nrow(p3)'], full_set, cert)
-    return (cert, FIGraphCount(g, count=1, sup_abs=rule.support_abs))
+    return (cert, FIGraph(g, count=1, sup_abs=rule.support_abs))
 
 def add_support(val, n):
     val[1].support_rel = float(val[1].support_abs) / float(n)
@@ -93,7 +93,7 @@ lines = sc.textFile("/home/kkrasnas/Documents/thesis/pattern_mining/tables/rules
 #map: key - graph hash, value - graph itself + count + support
 size = 1980
 hashedGraphs = lines.map(lambda row: map_freq_itemsets(row, size=size))
-group_by_shapes = hashedGraphs.reduceByKey(lambda a, b: FIGraphCount(a.fi_graph, a.count + b.count, a.support_abs + b.support_abs))
+group_by_shapes = hashedGraphs.reduceByKey(lambda a, b: FIGraph(a.fi_graph, a.count + b.count, a.support_abs + b.support_abs))
 
 
 fi_with_support = group_by_shapes.map(lambda val: add_support(val, size))

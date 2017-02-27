@@ -1,6 +1,6 @@
 
 
-class FIGraphCount:
+class FIGraph:
     #initial support is not defined, so -1
     def __init__(self, graph, count, sup_abs=-1.0, sup_rel=-1.0):
         self._fi_graph = graph

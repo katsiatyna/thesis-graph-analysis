@@ -4,25 +4,35 @@ from StringIO import StringIO
 
 
 class ARule:
-    def __init__(self, line, calculate_abs=False, size=1):
+    def __init__(self, line, size, calculate_abs=False):
         p = re.compile('\{(.*)\}')
         line = StringIO(line)
-        csv_reader = csv.DictReader(line, fieldnames=['1:nrow(p3)', 'numprecs', 'rules', 'support', 'confidence', 'lift',
-                                                 'precedent', 'consequent', 'code'])
+        fieldnames = []
+        if calculate_abs:
+            fieldnames=['1:nrow(p3)', 'numprecs', 'rules', 'support', 'confidence', 'lift',
+                                                 'precedent', 'consequent', 'code']
+        else:
+            fieldnames=['1:nrow(p3)', 'numprecs', 'rules', 'support', 'confidence', 'lift',
+                                                 'precedent', 'consequent', 'code', 'coverage', 'support_abs']
+
+        csv_reader = csv.DictReader(line, fieldnames)
 
         for row in csv_reader:
             self._conseq = p.search(row['consequent']).group(1) if  p.search(row['consequent']) != None else None
             self._ante = p.search(row['precedent']).group(1) if p.search(row['precedent']) != None else None
             self._support_rel = float(row['support'])
-            self._conf = float(row["confidence"])
+            self._conf = float(row['confidence'])
             self._lift = float(row["lift"])
             if(calculate_abs):
                 self._support_abs = self._support_rel * float(size)
                 self._support_abs_lhs = self._support_abs / self._conf
             else:
                 # later add code for extracting absolute values
-                self._support_abs = -1.0
-                self._support_abs_lhs = -1.0
+                self._support_abs = float(row['support_abs'])
+                self._support_abs_lhs = float(row['support_abs']) * float(size)
+            self._full_tids = set()
+            self._lhs_tids = set()
+
 
 
     @property
@@ -108,3 +118,27 @@ class ARule:
     @support_abs_lhs.deleter
     def support_abs_lhs(self):
         del self._support_abs_lhs
+
+    @property
+    def full_tids(self):
+        return self._full_tids
+
+    @full_tids.setter
+    def full_tids(self, value):
+        self._full_tids = value
+
+    @full_tids.deleter
+    def full_tids(self):
+        del self._full_tids
+
+    @property
+    def lhs_tids(self):
+        return self._lhs_tids
+
+    @lhs_tids.setter
+    def lhs_tids(self, value):
+        self._lhs_tids = value
+
+    @lhs_tids.deleter
+    def lhs_tids(self):
+        del self._lhs_tids

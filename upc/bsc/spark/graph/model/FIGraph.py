@@ -2,11 +2,14 @@
 
 class FIGraph:
     #initial support is not defined, so -1
-    def __init__(self, graph, count, sup_abs=-1.0, sup_rel=-1.0):
+    def __init__(self, graph, count, sup_abs=-1.0, sup_rel=-1.0, full_tids=set(), lhs_tids=set()):
         self._fi_graph = graph
         self._count = count
         self._support_abs = sup_abs
         self._support_rel = sup_rel
+        self._full_tids = full_tids
+        self._lhs_tids = lhs_tids
+
 
     @property
     def support_abs(self):
@@ -55,3 +58,27 @@ class FIGraph:
     @count.deleter
     def count(self):
         del self._count
+
+    @property
+    def full_tids(self):
+        return self._full_tids
+
+    @full_tids.setter
+    def full_tids(self, value):
+        self._full_tids = value
+
+    @full_tids.deleter
+    def full_tids(self):
+        del self._full_tids
+
+    @property
+    def lhs_tids(self):
+        return self._lhs_tids
+
+    @lhs_tids.setter
+    def lhs_tids(self, value):
+        self._lhs_tids = value
+
+    @lhs_tids.deleter
+    def lhs_tids(self):
+        del self._lhs_tids

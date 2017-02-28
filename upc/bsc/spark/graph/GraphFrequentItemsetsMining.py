@@ -34,19 +34,31 @@ except ImportError as e:
     sys.exit(1)
 
 
+def deduplicate_freq_itemsets(rule):
+    #extract edges, reorder vertices inside, then reorder edges
+    edges = rule.ante.split(',') if rule.ante is not None else []
+    edges.append(rule.conseq)
+    print edges
+    reordered_edges = list()
+    for edge in edges:
+        if edge != '':
+            vertices = edge.split('.')
+            vertices = sorted(map(int,vertices))
+            reordered_edges.append(''+str(vertices[0])+'.'+str(vertices[1]))
+    reordered_edges = sorted(reordered_edges)
+    #hash e.g. 31.23.34.5
+    hash = str(len(reordered_edges)) + ':' + ':'.join(reordered_edges)
+    print hash, rule.support_abs, rule.support_rel
+    return (hash,rule)
 
 
-def map_freq_itemsets(row, size):
-    #parse line
-    rule = ARule(row, True, )
-    #print rule
-    full_vertices = rule.conseq.split('.') if rule.conseq != None else []
+def map_arule_to_graph(rule):
+    full_vertices = rule.conseq.split('.') if rule.conseq is not None else []
     full_set = set(map(int, full_vertices))
     full_edges = list()
     full_edges.append(sorted(map(int, full_vertices)))
 
-
-    edges = rule.ante.split(',') if rule.ante != None else []
+    edges = rule.ante.split(',') if rule.ante is not None else []
     vertices_set = set()
     for edge in edges:
         vertices = edge.split('.')
@@ -59,16 +71,18 @@ def map_freq_itemsets(row, size):
         if len(edge) > 0:
             g.connect_vertex(full_set.index(edge[0]), full_set.index(edge[1]))
     cert = certificate(g)
-    #print (row['1:nrow(p3)'], full_set, cert)
     return (cert, FIGraph(g, count=1, sup_abs=rule.support_abs))
 
+
 def add_support(val, n):
-    val[1].support_rel = float(val[1].support_abs) / float(n)
+    val[1].support_abs = len(val[1].full_tids)
+    val[1].support_rel = len(val[1].full_tids) / float(n)
     return val
 
-def draw_graphs(all_graphs):
+
+def draw_graphs(graphs):
     i = 0
-    for example in all_graphs:
+    for example in graphs:
 
         #convert to networkx graph
         print (i,example[1].fi_graph)
@@ -89,21 +103,40 @@ def draw_graphs(all_graphs):
 
 conf = SparkConf().setAppName('FrequentShapes').setMaster('local')
 sc = SparkContext(conf=conf)
-lines = sc.textFile("/home/kkrasnas/Documents/thesis/pattern_mining/tables/rules_sample.csv")
-#map: key - graph hash, value - graph itself + count + support
 size = 1980
-hashedGraphs = lines.map(lambda row: map_freq_itemsets(row, size=size))
-group_by_shapes = hashedGraphs.reduceByKey(lambda a, b: FIGraph(a.fi_graph, a.count + b.count, a.support_abs + b.support_abs))
+lines = sc.textFile("/home/kkrasnas/Documents/thesis/pattern_mining/tables/rules_ext_sample.csv")
+header = lines.first() #extract header
+lines = lines.filter(lambda row: row != header)   #filter out header
+print lines.count()
 
+# convert each line to a rule
+rules = lines.map(lambda row: ARule(row, size, False))
 
+# hash each rule to define which represent EXACT SAME graphs
+hashed_rules = rules.map(lambda rule: deduplicate_freq_itemsets(rule))
+
+# trim the rules by leaving only distinct itemsets - only for frequent itemsets
+deduplicated_rules = hashed_rules.reduceByKey(lambda a,b: a)
+print deduplicated_rules.count()
+
+# map: key - graph hash, value - graph itself + count + support
+hashedGraphs = deduplicated_rules.map(lambda keyvalue: map_arule_to_graph(keyvalue[1]))
+
+# reduce with adding absolute support
+group_by_shapes = hashedGraphs.reduceByKey(lambda a, b:
+                                           FIGraph(a.fi_graph, a.count + b.count,
+                                                   full_tids=a.full_tids.update(b.full_tids),
+                                                   lhs_tids=a.lhs_tids.update(b.lhs_tids)))
+
+# calculate relative support with absolute and size of the dataset
 fi_with_support = group_by_shapes.map(lambda val: add_support(val, size))
 
 all_graphs = fi_with_support.collect()
-sum = 0
+#sum = 0
 for gr in all_graphs:
-    print gr[0], gr[1].count, gr[1].support_abs, gr[1].support_rel
-    sum += gr[1].count
-print sum
+    print gr[0], gr[1].support_abs, gr[1].support_rel
+#    sum += gr[1].count
+#print sum
 #draw_graphs(all_graphs)
 
 #fi_with_support.saveAsTextFile('/home/kkrasnas/Documents/thesis/pattern_mining/tables/test_res_sup1.out')

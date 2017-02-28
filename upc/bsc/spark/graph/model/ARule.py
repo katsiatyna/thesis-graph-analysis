@@ -13,7 +13,7 @@ class ARule:
                                                  'precedent', 'consequent', 'code']
         else:
             fieldnames=['1:nrow(p3)', 'numprecs', 'rules', 'support', 'confidence', 'lift',
-                                                 'precedent', 'consequent', 'code', 'coverage', 'support_abs']
+                                                 'precedent', 'consequent', 'code', 'tid_full', 'tid_lhs']
 
         csv_reader = csv.DictReader(line, fieldnames)
 
@@ -28,10 +28,10 @@ class ARule:
                 self._support_abs_lhs = self._support_abs / self._conf
             else:
                 # later add code for extracting absolute values
-                self._support_abs = float(row['support_abs'])
-                self._support_abs_lhs = float(row['support_abs']) * float(size)
-            self._full_tids = set()
-            self._lhs_tids = set()
+                self._support_abs = -1.0
+                self._support_abs_lhs = -1.0
+            self._full_tids = row['tid_full']
+            self._lhs_tids = row['tid_lhs']
 
 
 

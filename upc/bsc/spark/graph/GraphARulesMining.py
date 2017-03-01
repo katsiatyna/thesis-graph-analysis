@@ -78,6 +78,7 @@ def map_arule_to_ar_graphs(rule):
             full_edges.append(sorted(map(int, vertices)))
     full_set = sorted(list(full_set))
     lhs_set = sorted(list(lhs_set))
+    rhs_set = sorted(list(rhs_set))
     g_full = Graph(len(full_set))
     for edge in full_edges:
         if len(edge) > 0:
@@ -92,12 +93,12 @@ def map_arule_to_ar_graphs(rule):
             g_lhs.connect_vertex(lhs_set.index(edge[0]), lhs_set.index(edge[1]))
 
     cert = certificate(g_lhs) + certificate(g_rhs) + certificate(g_full)
-    return (cert, ARGraph(graph_lhs=g_lhs, graph_rhs=g_rhs, graph_full=g_full))
+    return (cert, ARGraph(graph_lhs=g_lhs, graph_rhs=g_rhs, graph_full=g_full, count=1, full_tids=rule.full_tids, lhs_tids=rule.lhs_tids))
 
 def reduce_by_shapes(a, b):
 
-    return ARGraph(a.graph_lhs, a.graph_rhs, a.graph_full, a.count + b.count, full_tids=a.full_tids.update(b.full_tids),
-                                                   lhs_tids=a.lhs_tids.update(b.lhs_tids))
+    return ARGraph(a.graph_lhs, a.graph_rhs, a.graph_full, a.count + b.count, full_tids=a.full_tids.union(b.full_tids),
+                                                   lhs_tids=a.lhs_tids.union(b.lhs_tids))
 
 
 def add_support_and_conf(val, n):
@@ -147,7 +148,7 @@ rules = lines.map(lambda row: ARule(row, size, False))
 #print deduplicated_rules.count()
 
 # map: key - graph hash, value - graph itself + count + support
-hashedGraphs = lines.map(lambda line: map_arule_to_ar_graphs(line))
+hashedGraphs = rules.map(lambda rule: map_arule_to_ar_graphs(rule))
 
 # reduce with adding absolute support
 group_by_shapes = hashedGraphs.reduceByKey(lambda a, b: reduce_by_shapes(a,b))
@@ -158,7 +159,7 @@ ar_with_support = group_by_shapes.map(lambda val: add_support_and_conf(val, size
 all_graphs = ar_with_support.collect()
 #sum = 0
 for gr in all_graphs:
-    print gr[0], gr[1].support_abs, gr[1].support_rel
+    print gr[0], gr[1].support_abs, gr[1].support_rel, gr[1].conf
 #    sum += gr[1].count
 #print sum
 #draw_graphs(all_graphs)

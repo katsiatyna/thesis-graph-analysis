@@ -38,7 +38,7 @@ def deduplicate_freq_itemsets(rule):
     #extract edges, reorder vertices inside, then reorder edges
     edges = rule.ante.split(',') if rule.ante is not None else []
     edges.append(rule.conseq)
-    print edges
+    #print edges
     reordered_edges = list()
     for edge in edges:
         if edge != '':
@@ -48,7 +48,7 @@ def deduplicate_freq_itemsets(rule):
     reordered_edges = sorted(reordered_edges)
     #hash e.g. 31.23.34.5
     hash = str(len(reordered_edges)) + ':' + ':'.join(reordered_edges)
-    print hash, rule.support_abs, rule.support_rel
+    #print hash, rule.support_abs, rule.support_rel
     return (hash,rule)
 
 
@@ -71,7 +71,9 @@ def map_arule_to_graph(rule):
         if len(edge) > 0:
             g.connect_vertex(full_set.index(edge[0]), full_set.index(edge[1]))
     cert = certificate(g)
-    return (cert, FIGraph(g, count=1, sup_abs=rule.support_abs))
+    fi_graph = FIGraph(g, count=1, full_tids=rule.full_tids, lhs_tids=rule.lhs_tids)
+    #print fi_graph.lhs_tids
+    return (cert, fi_graph)
 
 
 def add_support(val, n):
@@ -125,8 +127,8 @@ hashedGraphs = deduplicated_rules.map(lambda keyvalue: map_arule_to_graph(keyval
 # reduce with adding absolute support
 group_by_shapes = hashedGraphs.reduceByKey(lambda a, b:
                                            FIGraph(a.fi_graph, a.count + b.count,
-                                                   full_tids=a.full_tids.update(b.full_tids),
-                                                   lhs_tids=a.lhs_tids.update(b.lhs_tids)))
+                                                   full_tids=a.full_tids.union(b.full_tids) if a.full_tids is not None else b.full_tids,
+                                                   lhs_tids=a.lhs_tids.union(b.lhs_tids) if a.lhs_tids is not None else b.lhs_tids))
 
 # calculate relative support with absolute and size of the dataset
 fi_with_support = group_by_shapes.map(lambda val: add_support(val, size))

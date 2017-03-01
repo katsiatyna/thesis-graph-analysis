@@ -13,16 +13,20 @@ class ARule:
                                                  'precedent', 'consequent', 'code']
         else:
             fieldnames=['1:nrow(p3)', 'numprecs', 'rules', 'support', 'confidence', 'lift',
-                                                 'precedent', 'consequent', 'code', 'tid_full', 'tid_lhs']
+                                                 'precedent', 'consequent', 'code', 'full_tids', 'lhs_tids']
 
         csv_reader = csv.DictReader(line, fieldnames)
 
         for row in csv_reader:
-            self._conseq = p.search(row['consequent']).group(1) if  p.search(row['consequent']) != None else None
-            self._ante = p.search(row['precedent']).group(1) if p.search(row['precedent']) != None else None
+            self._conseq = p.search(row['consequent']).group(1) if p.search(row['consequent']) is not None else None
+            self._ante = p.search(row['precedent']).group(1) if p.search(row['precedent']) is not None else None
             self._support_rel = float(row['support'])
             self._conf = float(row['confidence'])
             self._lift = float(row["lift"])
+            self._full_tids = set(map(int, p.search(row['full_tids']).group(1).split(','))) #if p.search(row['full_tids']) is not None else []
+            self._lhs_tids = set(map(int, p.search(row['lhs_tids']).group(1).split(','))) #if p.search(row['lhs_tids']) is not None else []
+            if self._full_tids is None or self._lhs_tids is None:
+                print row
             if(calculate_abs):
                 self._support_abs = self._support_rel * float(size)
                 self._support_abs_lhs = self._support_abs / self._conf
@@ -30,8 +34,7 @@ class ARule:
                 # later add code for extracting absolute values
                 self._support_abs = -1.0
                 self._support_abs_lhs = -1.0
-            self._full_tids = row['tid_full']
-            self._lhs_tids = row['tid_lhs']
+
 
 
 

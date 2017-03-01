@@ -1,0 +1,33 @@
+Using Spark's default log4j profile: org/apache/spark/log4j-defaults.properties
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+17/03/01 16:44:52 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+17/03/01 16:44:52 WARN Utils: Your hostname, kkrasnas-Latitude-E7450 resolves to a loopback address: 127.0.1.1; using 10.193.185.246 instead (on interface wlp2s0)
+17/03/01 16:44:52 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+[Stage 1:======================================================>  (39 + 1) / 41]3000000
+2381060
+       @       �                             1458 0.736363636364
+       @       �                      1487 0.75101010101
+                       � 1405 0.709595959596
+       @       � 1517 0.766161616162
+       @       �         1770 0.893939393939
+       �       � 1329 0.671212121212
+                             � 1524 0.769696969697
+       �       @ 1738 0.877777777778
+               @       � 1628 0.822222222222
+       � 1676 0.846464646465
+       @       �                1588 0.80202020202
+       @       �                1652 0.834343434343
+       `       �       � 742 0.374747474747
+                      @       � 1569 0.792424242424
+                            � 1163 0.587373737374
+                                  � 1468 0.741414141414
+       @       �                      1628 0.822222222222
+       @       � 1111 0.561111111111
+       @       �       ` 1387 0.700505050505
+       �       @         1681 0.84898989899
+                       � 1340 0.676767676768
+                      �       ` 1260 0.636363636364
+       �               @        1647 0.831818181818
+
+Process finished with exit code 0

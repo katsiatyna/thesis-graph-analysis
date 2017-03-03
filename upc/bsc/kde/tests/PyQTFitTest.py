@@ -27,9 +27,12 @@ ds = sorted(map(float, [80407479,50425934,82653054,132506654,132512574,8137459,8
                         91154657,83253194,141224270,32935734,32930323,32929935,32934432,32934337,42831908,100420068,120155220,
                         89952391,89952299,58110742]))
 est = kde.KDE1D(ds)
-est.bandwidth = 10000000
+est.bandwidth = 5000000
+estimation = est(ds)
 #est.lower = 25319510
 #est.upper = 120155230
+print estimation
+print len(ds) == len(estimation)
 plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
 plt.legend(loc='best')
 plt.show()

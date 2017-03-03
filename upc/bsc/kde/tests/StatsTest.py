@@ -17,5 +17,5 @@ ds = sorted(map(float, [80407479,50425934,82653054,132506654,132512574,8137459,8
 print ds
 dens = sm.nonparametric.KDEUnivariate(ds)
 dens.fit()
-plt.plot(dens.cdf)
+plt.plot(dens.density)
 plt.show()

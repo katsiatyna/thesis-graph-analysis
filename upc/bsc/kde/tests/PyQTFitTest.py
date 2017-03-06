@@ -20,13 +20,25 @@ import sys
 #plt.xlabel('X')
 #plt.interactive(False)
 
+
+def find_absolute_position(position, chromosome):
+    if chromosome == 'X':
+        index = 22
+    else:
+        if chromosome == 'Y':
+            index = 23
+        else:
+            index = int(chromosome) - 1
+    return long(CHR_MAP[index]) + long(position)
+
+
 def load_edges(path='/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv'):
     with open(path, 'rb') as csvfile:
-        reader = csv.DictReader(csvfile, fieldnames=['Pos_BKP_1', 'Pos_BKP_2'])
+        reader = csv.DictReader(csvfile, fieldnames=['Pos_BKP_1', 'Chr_BKP_1', 'Pos_BKP_2', 'Chr_BKP_2'])
         next(csvfile)
         positions = []
         for row in reader:
-            positions.append((row['Pos_BKP_1'], row['Pos_BKP_2']))
+            positions.append((find_absolute_position(row['Pos_BKP_1'], row['Chr_BKP_1']), find_absolute_position(row['Pos_BKP_2'], row['Chr_BKP_2'])))
         return positions
 
 def convert_to_flat_array(edges):
@@ -71,13 +83,31 @@ def construct_new_assignment(original_pos, peak_indexes, edges):
 #                         91154657,83253194,141224270,32935734,32930323,32929935,32934432,32934337,42831908,100420068,120155220,
 #                         89952391,89952299,58110742]))
 
+#info chromosome
+CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
+           171115067, 159138663, 146364022, 141213431, 135534747,
+           135006516, 133851895, 115169878, 107349540, 102531392,
+           90354753, 81195210, 78077248, 59128983, 63025520,
+           48129895, 51304566, 155270560, 59373566]
+
+cxy = 0
+startxy = None
+endxy = None
+for  i in range(len(CHR_MAP)):
+    startxy =(startxy,cxy+1)
+    cxy = cxy + CHR_MAP[i]
+    endxy = (endxy,cxy)
+
+#labelxy = paste("chr",c(sprintf("%02d",seq(1:22)),"X","Y"),sep='')
+
+
 # read the positions from the largest sample
 edges = load_edges()
 ds = convert_to_flat_array(edges)
 
 # calculate density estimation
 est = kde.KDE1D(ds)
-est.bandwidth =500000
+est.bandwidth =10000 #10k window?
 estimation = est(ds)
 #est.lower = 25319510
 #est.upper = 120155230

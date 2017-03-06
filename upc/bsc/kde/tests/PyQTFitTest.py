@@ -7,6 +7,7 @@ from pyqt_fit import kde
 import peakutils
 from peakutils.plot import plot as pplot
 import csv
+import sys
 
 
 #f = norm(loc=0, scale=1)
@@ -18,16 +19,43 @@ import csv
 #plt.xlim(-3,3)
 #plt.xlabel('X')
 #plt.interactive(False)
-with open('/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv', 'rb') as csvfile:
-    reader = csv.DictReader(csvfile, fieldnames=['positions'])
-    next(csvfile)
-    positions = []
-    for row in reader:
-        poss = row['positions'].split(',')
-        positions.append(poss[0])
-        positions.append(poss[1])
 
-    ds = sorted(map(float,positions))
+def load_edges(path='/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv'):
+    with open(path, 'rb') as csvfile:
+        reader = csv.DictReader(csvfile, fieldnames=['Pos_BKP_1', 'Pos_BKP_2'])
+        next(csvfile)
+        positions = []
+        for row in reader:
+            positions.append((row['Pos_BKP_1'], row['Pos_BKP_2']))
+        return positions
+
+def convert_to_flat_array(edges):
+    positions = []
+    for edge in edges:
+        positions.append(edge[0])
+        positions.append(edge[1])
+    ds = sorted(set(map(float,positions)))
+    return ds
+
+def diff(pos, peak):
+    return abs(pos - peak)
+
+
+def find_closest_peak(i, peak_indexes):
+    min_diff = sys.maxint
+    closest_peak = -1
+    for peak in peak_indexes:
+        if(diff(i, peak) < min_diff):
+            min_diff = diff(i,peak)
+            closest_peak = peak
+    return closest_peak
+
+
+def construct_new_assignment(original_pos, peak_indexes, edges):
+    new_assignment = []
+    for edge in edges:
+        new_assignment.append((original_pos[find_closest_peak(original_pos.index(float(edge[0])), peak_indexes)], original_pos[find_closest_peak(original_pos.index(float(edge[1])), peak_indexes)]))
+    return new_assignment
 
 
 # ds = sorted(map(float, [80407479,50425934,82653054,132506654,132512574,8137459,8137565,55013506,21479214,41670179,43294258,45820099,
@@ -42,23 +70,43 @@ with open('/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv', 'r
 #                         144990143,112893006,170708906,47199123,111964714,4266657,4360229,36189429,57975730,61875756,62265611,
 #                         91154657,83253194,141224270,32935734,32930323,32929935,32934432,32934337,42831908,100420068,120155220,
 #                         89952391,89952299,58110742]))
+
+# read the positions from the largest sample
+edges = load_edges()
+ds = convert_to_flat_array(edges)
+
+# calculate density estimation
 est = kde.KDE1D(ds)
-est.bandwidth =1000000
+est.bandwidth =500000
 estimation = est(ds)
 #est.lower = 25319510
 #est.upper = 120155230
-print estimation
-print len(ds) == len(estimation)
-indexes = peakutils.indexes(estimation, thres=0.01, min_dist=0)
-print indexes
-for ind in indexes:
-    print ds[ind], estimation[ind]
-#plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
-pyplot.figure(figsize=(15,5))
-pyplot.plot(ds, estimation, '-bh', markevery=indexes)
-pyplot.title('Density Peaks')
 
+# find peaks in the density
+indexes = peakutils.indexes(estimation, thres=0.01, min_dist=0)
+#plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
+pyplot.figure(figsize=(20,5))
+pyplot.plot(ds, estimation, '-bh', markevery=indexes)
+pyplot.legend(loc='best')
+pyplot.title('Density Peaks. NmbPeaks = ' + str(len(indexes)))
 pyplot.show()
+
+# assign each point to closest peak and rewrite the edges
+
+
+
+new_assignment = construct_new_assignment(ds, indexes, edges)
+
+# write new assignment
+with open('/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv', 'wb') as csvfile:
+    fieldnames = ['pos_1', 'pos_2']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+    writer.writeheader()
+    for row in new_assignment:
+        writer.writerow({'pos_1': row[0], 'pos_2': row[1]})
+
+
  #use peaksutils or
 # f = norm(loc=0, scale=1)
 # xs = np.r_[-3:3:1024j]

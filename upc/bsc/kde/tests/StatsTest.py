@@ -1,6 +1,12 @@
 import numpy as np
 import statsmodels.api as sm
-import matplotlib.pyplot as plt
+from matplotlib import pylab as plt
+import matplotlib.pyplot as pyplot
+import peakutils
+
+
+def func(x, return_val):
+    return return_val
 
 ds = sorted(map(float, [80407479,50425934,82653054,132506654,132512574,8137459,8137565,55013506,21479214,41670179,43294258,45820099,
                  45864568,45880888,47120476,104483915,41745869,32087843,85867303,86386946,7537761,59316711,71262976,55866224,
@@ -14,8 +20,18 @@ ds = sorted(map(float, [80407479,50425934,82653054,132506654,132512574,8137459,8
                         144990143,112893006,170708906,47199123,111964714,4266657,4360229,36189429,57975730,61875756,62265611,
                         91154657,83253194,141224270,32935734,32930323,32929935,32934432,32934337,42831908,100420068,120155220,
                         89952391,89952299,58110742]))
-print ds
+
 dens = sm.nonparametric.KDEUnivariate(ds)
-dens.fit()
-plt.plot(dens.density)
-plt.show()
+dens.fit(bw = 1100000.0)
+indexes = peakutils.indexes(dens.density, thres=0.0, min_dist=0)
+x_plot_y = []
+for x in ds:
+    x_plot_y.append(func(ds, 0))
+#plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
+fig, ax = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
+             subplot_kw=None, gridspec_kw=None, figsize=(18, 5))
+ax.plot( dens.density , '-bh', markevery=indexes)
+#ax.plot(ds, x_plot_y, '+k')
+pyplot.legend(loc='best')
+pyplot.title('Density Peaks. NmbPeaks = ' + str(len(indexes)))
+pyplot.show()

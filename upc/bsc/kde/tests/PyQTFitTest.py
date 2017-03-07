@@ -2,7 +2,7 @@ import numpy as np
 #from scipy.stats import norm
 from matplotlib import pylab as plt
 from matplotlib import pyplot
-from pyqt_fit import kde
+from pyqt_fit import kde, kernels
 #from detect_peaks import detect_peaks
 import peakutils
 from peakutils.plot import plot as pplot
@@ -34,7 +34,7 @@ def find_absolute_position(position, chromosome):
 
 def load_edges(path='/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv'):
     with open(path, 'rb') as csvfile:
-        reader = csv.DictReader(csvfile, fieldnames=['Pos_BKP_1', 'Chr_BKP_1', 'Pos_BKP_2', 'Chr_BKP_2'])
+        reader = csv.DictReader(csvfile, fieldnames=['Chr_BKP_1', 'Pos_BKP_1', 'Chr_BKP_2', 'Pos_BKP_2'])
         next(csvfile)
         positions = []
         for row in reader:
@@ -68,6 +68,9 @@ def construct_new_assignment(original_pos, peak_indexes, edges):
     for edge in edges:
         new_assignment.append((original_pos[find_closest_peak(original_pos.index(float(edge[0])), peak_indexes)], original_pos[find_closest_peak(original_pos.index(float(edge[1])), peak_indexes)]))
     return new_assignment
+
+def func(x, return_val):
+    return return_val
 
 
 # ds = sorted(map(float, [80407479,50425934,82653054,132506654,132512574,8137459,8137565,55013506,21479214,41670179,43294258,45820099,
@@ -107,16 +110,21 @@ ds = convert_to_flat_array(edges)
 
 # calculate density estimation
 est = kde.KDE1D(ds)
-est.bandwidth =10000 #10k window?
+#est.kernel = kernels.normal_kernel1d()
+est.bandwidth =100000 #10k window?
 estimation = est(ds)
 #est.lower = 25319510
 #est.upper = 120155230
-
+x_plot_y = []
+for x in ds:
+    x_plot_y.append(func(ds, 0))
 # find peaks in the density
-indexes = peakutils.indexes(estimation, thres=0.01, min_dist=0)
+indexes = peakutils.indexes(estimation, thres=0.0, min_dist=0)
 #plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
-pyplot.figure(figsize=(20,5))
-pyplot.plot(ds, estimation, '-bh', markevery=indexes)
+fig, ax = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
+             subplot_kw=None, gridspec_kw=None, figsize=(18, 5))
+ax.plot(ds, estimation, '-bh', markevery=indexes)
+ax.plot(ds, x_plot_y, '+k')
 pyplot.legend(loc='best')
 pyplot.title('Density Peaks. NmbPeaks = ' + str(len(indexes)))
 pyplot.show()

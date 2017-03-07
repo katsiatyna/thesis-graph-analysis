@@ -148,4 +148,13 @@ with open('/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv', '
     writer.writeheader()
     for row in new_assignment:
         writer.writerow({'pos_1': row[0], 'pos_2': row[1]})
+        # write backward edges for GraphX
+        # writer.writerow({'pos_1': row[1], 'pos_2': row[0]})
 
+f = open('/home/kkrasnas/Documents/thesis/pattern_mining/graphXdir.txt', 'w')
+for row in new_assignment:
+    f.write(str(row[0]) + ' ' + str(row[1]) + '\n')
+    # write backward edges for GraphX
+    if row[0] != row[1]:
+        f.write(str(row[1]) + ' ' + str(row[0]) + '\n')
+f.close()

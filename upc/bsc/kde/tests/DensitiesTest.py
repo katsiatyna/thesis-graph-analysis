@@ -97,8 +97,8 @@ ds = convert_to_flat_array(edges)
 x_plot_y = []
 for x in ds:
     x_plot_y.append(func(ds, 0))
-fig, ax = plt.subplots(nrows=3, ncols=1, sharex=False, sharey=False, squeeze=True,
-             subplot_kw=None, gridspec_kw=None, figsize=(20, 10))
+fig, ax = plt.subplots(nrows=4, ncols=1, sharex=False, sharey=False, squeeze=True,
+             subplot_kw=None, gridspec_kw=None, figsize=(20, 15))
 pyplot.title('Bandwidth = ' + str(int(bandwidth/1000)) + 'kbp, NmbPoints = ' + str(len(ds)))
 # scipy
 X = np.array(ds)
@@ -111,15 +111,6 @@ ax[0].plot(ds, x_plot_y, '+k')
 ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy)), xy=get_axis_limits(ax[0]))
 
 
-# stastmodels.api
-dens_stats = sm.nonparametric.KDEUnivariate(ds)
-dens_stats.fit(bw=bandwidth)
-indexes_stats = peakutils.indexes(dens_stats.density, thres=0.1, min_dist=0)
-
-ax[1].plot(dens_stats.support, dens_stats.density, '-h', markevery=indexes_stats)
-ax[1].plot(ds, x_plot_y, '+k')
-ax[1].annotate('StatsModels. NmbPeaks = ' + str(len(indexes_stats)), xy=get_axis_limits(ax[1]))
-
 # pyqt-fit
 # calculate density estimation
 est = kde.KDE1D(ds)
@@ -130,9 +121,30 @@ estimation = est(ds)
 #est.upper = 120155230
 indexes = peakutils.indexes(estimation, thres=0.0, min_dist=0)
 #plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
-ax[2].plot(ds, estimation, '-h', markevery=indexes)
+ax[1].plot(ds, estimation, '-h', markevery=indexes)
+ax[1].plot(ds, x_plot_y, '+k')
+ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes)), xy=get_axis_limits(ax[1]))
+
+# stastmodels.api without FFT
+dens_stats = sm.nonparametric.KDEUnivariate(ds)
+dens_stats.fit(bw=bandwidth, fft=False)
+indexes_stats = peakutils.indexes(dens_stats.density, thres=0.1, min_dist=0)
+
+ax[2].plot(dens_stats.support, dens_stats.density, '-h', markevery=indexes_stats)
 ax[2].plot(ds, x_plot_y, '+k')
-ax[2].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes)), xy=get_axis_limits(ax[2]))
+ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_stats)), xy=get_axis_limits(ax[2]))
+
+# stastmodels.api without FFT
+dens_stats_fft = sm.nonparametric.KDEUnivariate(ds)
+dens_stats_fft.fit(bw=bandwidth, fft=True)
+indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.1, min_dist=0)
+
+ax[3].plot(dens_stats_fft.support, dens_stats_fft.density, '-h', markevery=indexes_stats_fft)
+ax[3].plot(ds, x_plot_y, '+k')
+ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_stats_fft)), xy=get_axis_limits(ax[3]))
+
+
+
 
 pyplot.show()
 
@@ -153,8 +165,8 @@ with open('/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv', '
 
 f = open('/home/kkrasnas/Documents/thesis/pattern_mining/graphXdir.txt', 'w')
 for row in new_assignment:
-    f.write(str(row[0]) + ' ' + str(row[1]) + '\n')
+    f.write(str(long(row[0])) + ' ' + str(long(row[1])) + '\n')
     # write backward edges for GraphX
     if row[0] != row[1]:
-        f.write(str(row[1]) + ' ' + str(row[0]) + '\n')
+        f.write(str(long(row[1])) + ' ' + str(long(row[0])) + '\n')
 f.close()

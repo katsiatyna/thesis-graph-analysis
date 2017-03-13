@@ -51,6 +51,8 @@ def vsigram(G, minFreq):
         edges_list = list()
         edges_list.append((vertices_list.index(edge[0]), vertices_list.index(edge[1])))
         label = certificate(g)
+        aut = autgrp(g)
+        #print label.decode('utf-8')
         subgraph1 = VsigramGraph(g, label,
                                  edges=edges_list, vertices=range(len(vertices_list)),
                                  orig_edges=[edge], orig_vertices=vertices_list)
@@ -78,13 +80,14 @@ def vsigram(G, minFreq):
     # for each clf1 in CLf1 do
     for clf1 in CLf1:
         # CLf = CLf + vsigram_exten(clf1, G, minFreq)
-        CLf.update(vsigram_extend(clf1, MCLf1[clf1], G, minFreq, MCLf, CLf))
+        CLf.update(vsigram_extend(clf1, MCLf1[clf1], G, minFreq, MCLf, CLf, 1+1))
     # end for
     # return CLf
     return CLf
 
 
-def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf):
+def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
+    print 'Processing size ' + str(size)
     # Sk+1 = NULL
     Skplus1 = list()
     # CLk+1 = NULL  // stores new, distinct canonical labels
@@ -143,7 +146,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf):
         # CLf = CLf + {clk+1} + vsigram_extend(clk+1, G, minFreq)
         CLf.add(clkplus1)
         MCLf[clkplus1] = MCLkplus1[clkplus1]
-        CLf.update(vsigram_extend(clkplus1, MCLkplus1[clkplus1], G, minFreq, MCLf, CLf))
+        CLf.update(vsigram_extend(clkplus1, MCLkplus1[clkplus1], G, minFreq, MCLf, CLf, size+1))
     # end for
     return CLf
 

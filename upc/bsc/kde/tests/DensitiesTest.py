@@ -68,6 +68,33 @@ def get_axis_limits(ax, scale=.9):
     return ax.get_xlim()[1]*scale, ax.get_ylim()[1]*scale
 
 
+def write_xgraph_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/graphXdir.txt'):
+    f = open(path, 'w')
+    for row in assignment:
+        f.write(str(long(row[0])) + ' ' + str(long(row[1])) + '\n')
+        # write backward edges for GraphX
+        if row[0] != row[1]:
+            f.write(str(long(row[1])) + ' ' + str(long(row[0])) + '\n')
+    f.close()
+
+
+def write_lg_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/graph.lg'):
+    f = open(path, 'w')
+    f.write('# t 1\n')
+    vertices = set()
+    for row in assignment:
+        vertices.add(row[0])
+        vertices.add(row[1])
+    vertices = sorted(list(vertices))
+    assignment_sorted = sorted(assignment,key=lambda x: x[0])
+    for i in range(len(vertices)):
+        f.write('v ' + str(i) + ' 0\n')
+
+    for row in assignment_sorted:
+        f.write('e ' + str(vertices.index(row[0])) + ' ' + str(vertices.index(row[1])) + ' 1\n')
+
+    f.close()
+
 # ds = sorted(map(float, [80407479,50425934,82653054,132506654,132512574,8137459,8137565,55013506,21479214,41670179,43294258,45820099,
 #                  45864568,45880888,47120476,104483915,41745869,32087843,85867303,86386946,7537761,59316711,71262976,55866224,
 #                  185147302,234917206,234917491,24489763,24755242,30971243,39867712,39883066,11421883,11836267,29602419,115902151,
@@ -163,10 +190,6 @@ with open('/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv', '
         # write backward edges for GraphX
         # writer.writerow({'pos_1': row[1], 'pos_2': row[0]})
 
-f = open('/home/kkrasnas/Documents/thesis/pattern_mining/graphXdir.txt', 'w')
-for row in new_assignment:
-    f.write(str(long(row[0])) + ' ' + str(long(row[1])) + '\n')
-    # write backward edges for GraphX
-    if row[0] != row[1]:
-        f.write(str(long(row[1])) + ' ' + str(long(row[0])) + '\n')
-f.close()
+
+write_xgraph_input_file(new_assignment)
+write_lg_input_file(new_assignment)

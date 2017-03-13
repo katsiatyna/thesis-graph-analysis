@@ -2,14 +2,15 @@
 
 class VsigramGraph:
     #initial support is not defined, so -1
-    def __init__(self, graph, label='', sup_abs=-1.0, sup_rel=-1.0, edges=list(), vertices=list()):
+    def __init__(self, graph, label='', sup_abs=-1.0, sup_rel=-1.0, edges=list(), vertices=list(), orig_edges=list(), orig_vertices=list()):
         self._pn_graph = graph
         self._label = label
         self._support_abs = sup_abs
         self._support_rel = sup_rel
         self._edges = edges
         self._vertices = vertices
-
+        self._orig_edges = orig_edges
+        self._orig_vertices = orig_vertices
 
     @property
     def support_abs(self):
@@ -82,3 +83,27 @@ class VsigramGraph:
     @vertices.deleter
     def vertices(self):
         del self._vertices
+
+    @property
+    def orig_edges(self):
+        return self._orig_edges
+
+    @orig_edges.setter
+    def orig_edges(self, value):
+        self._orig_edges = value
+
+    @orig_edges.deleter
+    def orig_edges(self):
+        del self._orig_edges
+
+    @property
+    def orig_vertices(self):
+        return self._orig_vertices
+
+    @orig_vertices.setter
+    def orig_vertices(self, value):
+        self._orig_vertices = value
+
+    @orig_vertices.deleter
+    def orig_vertices(self):
+        del self._orig_vertices

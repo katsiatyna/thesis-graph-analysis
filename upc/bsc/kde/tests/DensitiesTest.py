@@ -78,6 +78,18 @@ def write_xgraph_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pa
     f.close()
 
 
+def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv'):
+    # write new assignment
+    with open(path, 'wb') as csvfile:
+        fieldnames = ['pos_1', 'pos_2']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        for row in assignment:
+            writer.writerow({'pos_1': row[0], 'pos_2': row[1]})
+
+
+
 def write_lg_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/graph.lg'):
     f = open(path, 'w')
     f.write('# t 1\n')
@@ -178,18 +190,6 @@ pyplot.show()
 
 # assign each point to closest peak and rewrite the edges
 new_assignment = construct_new_assignment(ds, indexes, edges)
-
-# write new assignment
-with open('/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv', 'wb') as csvfile:
-    fieldnames = ['pos_1', 'pos_2']
-    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-    writer.writeheader()
-    for row in new_assignment:
-        writer.writerow({'pos_1': row[0], 'pos_2': row[1]})
-        # write backward edges for GraphX
-        # writer.writerow({'pos_1': row[1], 'pos_2': row[0]})
-
-
+write_undirect_input_file(new_assignment)
 write_xgraph_input_file(new_assignment)
 write_lg_input_file(new_assignment)

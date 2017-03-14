@@ -28,9 +28,8 @@ def map_csv_to_graph(path='/home/kkrasnas/Documents/thesis/pattern_mining/new_as
             else:
                 g.connect_vertex(vertices_list.index(edge[1]), vertices_list.index(edge[0]))
                 edges_set.add((vertices_list.index(edge[1]), vertices_list.index(edge[0])))
-        # cert = certificate(g)
         edges = list(edges_set)
-        return VsigramGraph(g, certificate(g), 1, 1,
+        return VsigramGraph(g, certificate(g), canon_label(g), 1, 1,
                             edges=edges, vertices=range(len(vertices_list)),
                             orig_edges=positions, orig_vertices=vertices_list)
 
@@ -40,6 +39,7 @@ def vsigram(G, minFreq):
     CLf = set()
     # CLf1 = all frequent canonical labels of size 1 (edge) subgraphs in G
     CLf1 = set()
+    labels1 = set()
     MCLf = dict()
     MCLf1 = dict()
     for edge in G.edges:
@@ -51,9 +51,9 @@ def vsigram(G, minFreq):
         edges_list = list()
         edges_list.append((vertices_list.index(edge[0]), vertices_list.index(edge[1])))
         label = certificate(g)
-        aut = autgrp(g)
+        #aut = autgrp(g)
         #print label.decode('utf-8')
-        subgraph1 = VsigramGraph(g, label,
+        subgraph1 = VsigramGraph(g, label, canon_label(g),
                                  edges=edges_list, vertices=range(len(vertices_list)),
                                  orig_edges=[edge], orig_vertices=vertices_list)
         if subgraph1.label not in CLf1:
@@ -61,6 +61,7 @@ def vsigram(G, minFreq):
             MCLf1[label] = [subgraph1]
         else:
             MCLf1[label].append(subgraph1)
+        labels1.add(subgraph1.label_arr)
 
     # for each clf1 in CLf1 do
     for key in MCLf1.keys():
@@ -92,6 +93,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
     Skplus1 = list()
     # CLk+1 = NULL  // stores new, distinct canonical labels
     CLkplus1 = set()
+    labelsplus1 = set()
     MCLkplus1 = dict()
     # for each sk in M(clfk ) do
     for sk in Mclfk:
@@ -117,7 +119,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
                     g.connect_vertex(orig_vertices_list.index(new_orig_edge[0]), orig_vertices_list.index(new_orig_edge[1]))
                     edges.append((orig_vertices_list.index(new_orig_edge[0]), orig_vertices_list.index(new_orig_edge[1])))
                 label = certificate(g)
-                subgraphkplus1 = VsigramGraph(g, label,
+                subgraphkplus1 = VsigramGraph(g, label, canon_label(g),
                                               edges=edges, vertices=range(len(orig_vertices_list)),
                                               orig_edges=orig_edges, orig_vertices=orig_vertices_list)
                 Skplus1.append(subgraphkplus1)
@@ -126,6 +128,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
     for skplus1 in Skplus1:
         # CLk+1 = CLk+1 + (sk+1.label) // only distinct canonical labels
         CLkplus1.add(skplus1.label)
+        labelsplus1.add(skplus1.label_arr)
         # M(sk+1.label) = M(sk+1.label) + {sk+1} //add subgraph
         if skplus1.label not in MCLkplus1:
             MCLkplus1[skplus1.label] = [skplus1]
@@ -135,7 +138,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
     # for each clk+1 in CLk+1 do
     for clkplus1 in CLkplus1:
         # if clfk is not the generating parent of clk+1 then
-        if False:  # generating parent function
+        if False: # !generating_parent():  # generating parent function
             continue
         # end if
         # compute clk+1.freq from M(clk+1)
@@ -145,7 +148,10 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
         # end if
         # CLf = CLf + {clk+1} + vsigram_extend(clk+1, G, minFreq)
         CLf.add(clkplus1)
-        MCLf[clkplus1] = MCLkplus1[clkplus1]
+        if(clkplus1 not in MCLf):
+            MCLf[clkplus1] = MCLkplus1[clkplus1]
+        else:
+            MCLf[clkplus1].append(MCLkplus1[clkplus1])
         CLf.update(vsigram_extend(clkplus1, MCLkplus1[clkplus1], G, minFreq, MCLf, CLf, size+1))
     # end for
     return CLf

@@ -21,6 +21,7 @@ with open('/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv', '
     for edge in positions:
         G.add_edge(vertices_list.index(edge[0]), vertices_list.index(edge[1]))
     print G.number_of_edges()
+
     plt.figure(figsize=(10,10))
     nx.draw_circular(G, with_labels=False)
     plt.show()

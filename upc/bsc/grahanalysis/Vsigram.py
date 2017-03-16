@@ -1,3 +1,4 @@
+import datetime
 from pynauty import *
 import csv
 
@@ -107,7 +108,7 @@ def vsigram(G, minFreq):
 
 
 def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
-    print 'Processing size ' + str(size)
+    #print 'Processing size ' + str(size)
     # Sk+1 = NULL
     Skplus1 = list()
     # CLk+1 = NULL  // stores new, distinct canonical labels
@@ -149,7 +150,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
         # CLk+1 = CLk+1 + (sk+1.label) // only distinct canonical labels
         # CHECK BASED ON ORIGINAL EDGES AND VERTICES IF THIS GRAPH HAS ALREADY BEEN PROCESSED
         if skplus1.hash_str in processed_subgraphs:
-            print 'Skipping the graph with hash: ' + skplus1.hash_str
+            # print 'Skipping the graph with hash: ' + skplus1.hash_str
             continue
 
         # IF IT'S A NEW SUBGRAPH, ADD IT TO THE SET AND DICTIONARY
@@ -184,7 +185,12 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
     # end for
     return CLf
 
-
+start_time = datetime.datetime.now()
+print 'Start time is:' + str(start_time)
 processed_subgraphs = dict()
 graph = map_csv_to_graph()
 frequent_labels, frequent_subgraphs = vsigram(graph, 1)
+end_time = datetime.datetime.now()
+print 'End time is:' + str(end_time)
+print 'Elapsed: ' + str(end_time - start_time)
+print frequent_labels

@@ -1,8 +1,9 @@
 
 
 class VsigramGraph:
-    #initial support is not defined, so -1
-    def __init__(self, graph, label='', label_arr='', sup_abs=-1.0, sup_rel=-1.0, edges=list(), vertices=list(), orig_edges=list(), orig_vertices=list()):
+    # initial support is not defined, so -1
+    def __init__(self, graph, hash_str, label='', label_arr='', sup_abs=-1.0, sup_rel=-1.0,
+                 edges=list(), vertices=list(), orig_edges=list(), orig_vertices=list()):
         self._pn_graph = graph
         self._label = label
         self._label_arr = label_arr
@@ -12,6 +13,7 @@ class VsigramGraph:
         self._vertices = vertices
         self._orig_edges = orig_edges
         self._orig_vertices = orig_vertices
+        self._hash_str = hash_str
 
     @property
     def support_abs(self):
@@ -120,3 +122,15 @@ class VsigramGraph:
     @orig_vertices.deleter
     def orig_vertices(self):
         del self._orig_vertices
+
+    @property
+    def hash_str(self):
+        return self._hash_str
+
+    @hash_str.setter
+    def hash_str(self, value):
+        self._hash_str = value
+
+    @hash_str.deleter
+    def hash_str(self):
+        del self._hash_str

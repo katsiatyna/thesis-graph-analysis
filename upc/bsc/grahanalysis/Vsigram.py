@@ -20,6 +20,8 @@ def map_csv_to_graph(path='/home/kkrasnas/Documents/thesis/pattern_mining/new_as
             vertices_set.add(position[1])
         vertices_list = list(vertices_set)
         g = Graph(len(vertices_list))
+
+        # ORIGINAL EDGES ARE ALL SORTED MIN -> MAX
         for edge in positions:
             # always minIndex -> maxIndex to avoid duplicate edges
             if vertices_list.index(edge[0]) < vertices_list.index(edge[1]):
@@ -29,9 +31,20 @@ def map_csv_to_graph(path='/home/kkrasnas/Documents/thesis/pattern_mining/new_as
                 g.connect_vertex(vertices_list.index(edge[1]), vertices_list.index(edge[0]))
                 edges_set.add((vertices_list.index(edge[1]), vertices_list.index(edge[0])))
         edges = list(edges_set)
-        return VsigramGraph(g, certificate(g), canon_label(g), 1, 1,
+        return VsigramGraph(g, get_subgraph_hash(edges), certificate(g), canon_label(g), 1, 1,
                             edges=edges, vertices=range(len(vertices_list)),
                             orig_edges=positions, orig_vertices=vertices_list)
+
+
+def get_subgraph_hash(edges):
+    # ORDER INSIDE EDGES IS ALREADY DONE
+    # NOW ONLY NEED TO ORDER EDGES BETWEEN THEMSELVES
+    hash_str = ''
+    # rearrange the edges
+    edges = sorted(edges)  # sorts on the first elements first and then on second
+    for edge in edges:
+        hash_str += str(edge[0]) + '.' + str(edge[1]) + ';'
+    return hash_str
 
 
 def vsigram(G, minFreq):
@@ -53,7 +66,7 @@ def vsigram(G, minFreq):
         label = certificate(g)
         #aut = autgrp(g)
         #print label.decode('utf-8')
-        subgraph1 = VsigramGraph(g, label, canon_label(g),
+        subgraph1 = VsigramGraph(g, get_subgraph_hash([edge]), label=label, label_arr=canon_label(g),
                                  edges=edges_list, vertices=range(len(vertices_list)),
                                  orig_edges=[edge], orig_vertices=vertices_list)
         if subgraph1.label not in CLf1:
@@ -61,6 +74,7 @@ def vsigram(G, minFreq):
             MCLf1[label] = [subgraph1]
         else:
             MCLf1[label].append(subgraph1)
+        processed_subgraphs[subgraph1.hash_str] = subgraph1
         labels1.add(subgraph1.label_arr)
 
     # for each clf1 in CLf1 do
@@ -83,8 +97,13 @@ def vsigram(G, minFreq):
         # CLf = CLf + vsigram_exten(clf1, G, minFreq)
         CLf.update(vsigram_extend(clf1, MCLf1[clf1], G, minFreq, MCLf, CLf, 1+1))
     # end for
+    # FINALLY CHECK ALL FREQUENCIES
+    for key in MCLf.keys():
+        if len(MCLf[key]) < minFreq:
+            del MCLf[key]
+            CLf.remove(key)
     # return CLf
-    return CLf
+    return CLf, MCLf
 
 
 def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
@@ -119,14 +138,22 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
                     g.connect_vertex(orig_vertices_list.index(new_orig_edge[0]), orig_vertices_list.index(new_orig_edge[1]))
                     edges.append((orig_vertices_list.index(new_orig_edge[0]), orig_vertices_list.index(new_orig_edge[1])))
                 label = certificate(g)
-                subgraphkplus1 = VsigramGraph(g, label, canon_label(g),
+                subgraphkplus1 = VsigramGraph(g, get_subgraph_hash(orig_edges), label, canon_label(g),
                                               edges=edges, vertices=range(len(orig_vertices_list)),
                                               orig_edges=orig_edges, orig_vertices=orig_vertices_list)
                 Skplus1.append(subgraphkplus1)
     # end for
     # for each sk+1 in Sk+1
+    # ON THIS LEVEL CHECK IF THE SUBGRAPH HAS ALREADY BEEN PROCESSED AND DO NOT ADD IT IN THIS CASE!
     for skplus1 in Skplus1:
         # CLk+1 = CLk+1 + (sk+1.label) // only distinct canonical labels
+        # CHECK BASED ON ORIGINAL EDGES AND VERTICES IF THIS GRAPH HAS ALREADY BEEN PROCESSED
+        if skplus1.hash_str in processed_subgraphs:
+            print 'Skipping the graph with hash: ' + skplus1.hash_str
+            continue
+
+        # IF IT'S A NEW SUBGRAPH, ADD IT TO THE SET AND DICTIONARY
+        processed_subgraphs[skplus1.hash_str] = skplus1
         CLkplus1.add(skplus1.label)
         labelsplus1.add(skplus1.label_arr)
         # M(sk+1.label) = M(sk+1.label) + {sk+1} //add subgraph
@@ -138,17 +165,18 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
     # for each clk+1 in CLk+1 do
     for clkplus1 in CLkplus1:
         # if clfk is not the generating parent of clk+1 then
-        if False: # !generating_parent():  # generating parent function
-            continue
+        # if False: # !generating_parent():  # generating parent function
+            # continue
         # end if
         # compute clk+1.freq from M(clk+1)
         # if clk+1.freq < minFreq then
-        if len(MCLkplus1[clkplus1]) < minFreq:
-            continue
+        # HAVE TO CANCEL THIS STEP SINCE IT'S NOT CALCULATING FULL FREQUENCY
+        # if len(MCLkplus1[clkplus1]) < minFreq:
+            # continue
         # end if
         # CLf = CLf + {clk+1} + vsigram_extend(clk+1, G, minFreq)
         CLf.add(clkplus1)
-        if(clkplus1 not in MCLf):
+        if clkplus1 not in MCLf:
             MCLf[clkplus1] = MCLkplus1[clkplus1]
         else:
             MCLf[clkplus1].append(MCLkplus1[clkplus1])
@@ -157,5 +185,6 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
     return CLf
 
 
+processed_subgraphs = dict()
 graph = map_csv_to_graph()
-frequent_subgraphs = vsigram(graph, 1)
+frequent_labels, frequent_subgraphs = vsigram(graph, 1)

@@ -75,7 +75,7 @@ def vsigram(G, minFreq):
             MCLf1[label] = [subgraph1]
         else:
             MCLf1[label].append(subgraph1)
-        processed_subgraphs[subgraph1.hash_str] = subgraph1
+        processed_subgraphs.add(subgraph1.hash_str)
         labels1.add(subgraph1.label_arr)
 
     # for each clf1 in CLf1 do
@@ -154,7 +154,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
             continue
 
         # IF IT'S A NEW SUBGRAPH, ADD IT TO THE SET AND DICTIONARY
-        processed_subgraphs[skplus1.hash_str] = skplus1
+        processed_subgraphs.add(skplus1.hash_str)
         CLkplus1.add(skplus1.label)
         labelsplus1.add(skplus1.label_arr)
         # M(sk+1.label) = M(sk+1.label) + {sk+1} //add subgraph
@@ -187,7 +187,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
 
 start_time = datetime.datetime.now()
 print 'Start time is:' + str(start_time)
-processed_subgraphs = dict()
+processed_subgraphs = set()
 graph = map_csv_to_graph()
 frequent_labels, frequent_subgraphs = vsigram(graph, 1)
 end_time = datetime.datetime.now()

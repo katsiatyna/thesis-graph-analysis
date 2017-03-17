@@ -20,7 +20,7 @@ def find_absolute_position(position, chromosome):
     return long(CHR_MAP[index]) + long(position)
 
 
-def load_edges(path='/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv'):
+def load_edges(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/7d734d06-f2b1-4924-a201-620ac8084c49_positions.csv'):
     with open(path, 'rb') as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=['Chr_BKP_1', 'Pos_BKP_1', 'Chr_BKP_2', 'Pos_BKP_2'])
         next(csvfile)
@@ -56,8 +56,12 @@ def find_closest_peak(i, peak_indexes):
 def construct_new_assignment(original_pos, peak_indexes, edges):
     new_assignment = []
     for edge in edges:
-        new_assignment.append((original_pos[find_closest_peak(original_pos.index(float(edge[0])), peak_indexes)], original_pos[find_closest_peak(original_pos.index(float(edge[1])), peak_indexes)]))
+        new_assignment.append((original_pos[find_closest_peak(original_pos.index(float(edge[0])), peak_indexes)],
+                               original_pos[find_closest_peak(original_pos.index(float(edge[1])), peak_indexes)]))
     return new_assignment
+
+def construct_new_assignment_fft(original_pos, peak_indexes, edges):
+    pass
 
 
 def func(x, return_val):
@@ -78,7 +82,7 @@ def write_xgraph_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pa
     f.close()
 
 
-def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv'):
+def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment.csv'):
     # write new assignment
     with open(path, 'wb') as csvfile:
         fieldnames = ['pos_1', 'pos_2']
@@ -127,7 +131,7 @@ CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
            90354753, 81195210, 78077248, 59128983, 63025520,
            48129895, 51304566, 155270560, 59373566]
 
-bandwidth = 1000000.0
+bandwidth = 50000.0
 # read the positions from the largest sample
 edges = load_edges()
 ds = convert_to_flat_array(edges)
@@ -167,16 +171,16 @@ ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes)), xy=get_axis_limits(a
 # stastmodels.api without FFT
 dens_stats = sm.nonparametric.KDEUnivariate(ds)
 dens_stats.fit(bw=bandwidth, fft=False)
-indexes_stats = peakutils.indexes(dens_stats.density, thres=0.1, min_dist=0)
+indexes_stats = peakutils.indexes(dens_stats.density, thres=0.0, min_dist=0)
 
 ax[2].plot(dens_stats.support, dens_stats.density, '-h', markevery=indexes_stats)
 ax[2].plot(ds, x_plot_y, '+k')
 ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_stats)), xy=get_axis_limits(ax[2]))
 
-# stastmodels.api without FFT
+# stastmodels.api with FFT
 dens_stats_fft = sm.nonparametric.KDEUnivariate(ds)
 dens_stats_fft.fit(bw=bandwidth, fft=True)
-indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.1, min_dist=0)
+indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.09, min_dist=0)
 
 ax[3].plot(dens_stats_fft.support, dens_stats_fft.density, '-h', markevery=indexes_stats_fft)
 ax[3].plot(ds, x_plot_y, '+k')
@@ -185,11 +189,13 @@ ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_stats_fft)), xy=get_ax
 
 
 
-pyplot.show()
+
 
 
 # assign each point to closest peak and rewrite the edges
 new_assignment = construct_new_assignment(ds, indexes, edges)
 write_undirect_input_file(new_assignment)
-write_xgraph_input_file(new_assignment)
-write_lg_input_file(new_assignment)
+# write_xgraph_input_file(new_assignment)
+# write_lg_input_file(new_assignment)
+
+pyplot.show()

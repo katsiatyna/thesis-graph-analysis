@@ -49,11 +49,6 @@ def get_subgraph_hash(edges):
 
 
 def vsigram(G, minFreq):
-    # CLf = NULL //a set of frequent canonical labels
-    CLf = set()
-    # CLf1 = all frequent canonical labels of size 1 (edge) subgraphs in G
-    CLf1 = set()
-    labels1 = set()
     MCLf = dict()
     MCLf1 = dict()
     for edge in G.edges:
@@ -70,13 +65,11 @@ def vsigram(G, minFreq):
         subgraph1 = VsigramGraph(g, get_subgraph_hash([edge]), label=label, label_arr=canon_label(g),
                                  edges=edges_list, vertices=range(len(vertices_list)),
                                  orig_edges=[edge], orig_vertices=vertices_list)
-        if subgraph1.label not in CLf1:
-            CLf1.add(subgraph1.label)
-            MCLf1[label] = [subgraph1]
+        if subgraph1.label not in MCLf1:
+            MCLf1[subgraph1.label] = [subgraph1]
         else:
-            MCLf1[label].append(subgraph1)
+            MCLf1[subgraph1.label].append(subgraph1)
         processed_subgraphs.add(subgraph1.hash_str)
-        labels1.add(subgraph1.label_arr)
 
     # for each clf1 in CLf1 do
     for key in MCLf1.keys():
@@ -85,35 +78,31 @@ def vsigram(G, minFreq):
         if len(MCLf1[key]) < minFreq:
             #remove from frequent labels and frequent subgraphs
             del MCLf1[key]
-            CLf1.remove(key)
         else:
             # add to all frequent
-            CLf.add(key)
             MCLf[key] = MCLf1[key]
 
     # end for
 
     # for each clf1 in CLf1 do
-    for clf1 in CLf1:
+    for clf1 in MCLf1.keys():
         # CLf = CLf + vsigram_exten(clf1, G, minFreq)
-        CLf.update(vsigram_extend(clf1, MCLf1[clf1], G, minFreq, MCLf, CLf, 1+1))
+        MCLf.update(vsigram_extend(clf1, MCLf1[clf1], G, minFreq, MCLf, 1+1))
     # end for
     # FINALLY CHECK ALL FREQUENCIES
+    print 'Starting to eliminate keys'
     for key in MCLf.keys():
         if len(MCLf[key]) < minFreq:
             del MCLf[key]
-            CLf.remove(key)
-    # return CLf
-    return CLf, MCLf
+    # return MCLf
+    return MCLf
 
 
-def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
+def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
     #print 'Processing size ' + str(size)
     # Sk+1 = NULL
     Skplus1 = list()
     # CLk+1 = NULL  // stores new, distinct canonical labels
-    CLkplus1 = set()
-    labelsplus1 = set()
     MCLkplus1 = dict()
     # for each sk in M(clfk ) do
     for sk in Mclfk:
@@ -155,8 +144,6 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
 
         # IF IT'S A NEW SUBGRAPH, ADD IT TO THE SET AND DICTIONARY
         processed_subgraphs.add(skplus1.hash_str)
-        CLkplus1.add(skplus1.label)
-        labelsplus1.add(skplus1.label_arr)
         # M(sk+1.label) = M(sk+1.label) + {sk+1} //add subgraph
         if skplus1.label not in MCLkplus1:
             MCLkplus1[skplus1.label] = [skplus1]
@@ -164,7 +151,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
             MCLkplus1[skplus1.label].append(skplus1)
     # end for
     # for each clk+1 in CLk+1 do
-    for clkplus1 in CLkplus1:
+    for clkplus1 in MCLkplus1.keys():
         # if clfk is not the generating parent of clk+1 then
         # if False: # !generating_parent():  # generating parent function
             # continue
@@ -176,21 +163,21 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, CLf, size):
             # continue
         # end if
         # CLf = CLf + {clk+1} + vsigram_extend(clk+1, G, minFreq)
-        CLf.add(clkplus1)
         if clkplus1 not in MCLf:
             MCLf[clkplus1] = MCLkplus1[clkplus1]
         else:
             MCLf[clkplus1].append(MCLkplus1[clkplus1])
-        CLf.update(vsigram_extend(clkplus1, MCLkplus1[clkplus1], G, minFreq, MCLf, CLf, size+1))
+        MCLf.update(vsigram_extend(clkplus1, MCLkplus1[clkplus1], G, minFreq, MCLf, size+1))
     # end for
-    return CLf
+    # print 'Done with size ' + str(size)
+    return MCLf
 
 start_time = datetime.datetime.now()
 print 'Start time is:' + str(start_time)
 processed_subgraphs = set()
 graph = map_csv_to_graph()
-frequent_labels, frequent_subgraphs = vsigram(graph, 1)
+frequent_subgraphs = vsigram(graph, 1)
 end_time = datetime.datetime.now()
 print 'End time is:' + str(end_time)
 print 'Elapsed: ' + str(end_time - start_time)
-print frequent_labels
+print frequent_subgraphs

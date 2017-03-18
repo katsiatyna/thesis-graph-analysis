@@ -1,5 +1,6 @@
 import datetime
 from pynauty import *
+import networkx as nx
 import csv
 
 from upc.bsc.grahanalysis.model.VsigramGraph import VsigramGraph
@@ -59,16 +60,15 @@ def vsigram(G, minFreq):
         g.connect_vertex(vertices_list.index(edge[0]), vertices_list.index(edge[1]))
         edges_list = list()
         edges_list.append((vertices_list.index(edge[0]), vertices_list.index(edge[1])))
-        label = certificate(g)
         #aut = autgrp(g)
         #print label.decode('utf-8')
-        subgraph1 = VsigramGraph(g, get_subgraph_hash([edge]), label=label, label_arr=canon_label(g),
+        subgraph1 = VsigramGraph(g, get_subgraph_hash([edge]), label=certificate(g), label_arr=canon_label(g),
                                  edges=edges_list, vertices=range(len(vertices_list)),
                                  orig_edges=[edge], orig_vertices=vertices_list)
         if subgraph1.label not in MCLf1:
-            MCLf1[subgraph1.label] = [subgraph1]
+            MCLf1[subgraph1.label_arr] = [subgraph1]
         else:
-            MCLf1[subgraph1.label].append(subgraph1)
+            MCLf1[subgraph1.label_arr].append(subgraph1)
         processed_subgraphs.add(subgraph1.hash_str)
 
     # for each clf1 in CLf1 do
@@ -96,6 +96,43 @@ def vsigram(G, minFreq):
             del MCLf[key]
     # return MCLf
     return MCLf
+
+
+def generating_parent(c_child, c_parent):
+    # find all edges of the child
+    # '  0:  0;  1:  6 7;  2:  2 8;  3:  3 13;  4:  4 12;  5:  5 9 13;  6:  1 6 11;  7:  1 7 14;  8:  2 8 9;  9:  5 8 10 14; 10:  9 12 14 15; 11:  6 11 13 15; 12:  4 10 12 15; 13:  3 5 11 13; 14:  7 9 10 14 15; 15:  10 11 12 14 15;'
+    edges = list()
+    adj_elements = c_child[:-1].split(';')
+    for adj_line in adj_elements:
+        adj_line = adj_line.strip()
+        edges_line = adj_line.split(':')
+        out_edge = int(edges_line[0])
+        in_edges = edges_line[1].strip().split(' ')
+        for element in in_edges:
+            in_edge = int(element)
+            edges.append((out_edge, in_edge))
+    # deleting last edge
+    last_edge = edges[len(edges) - 1]
+    while(last_edge is not None):
+        edges.remove(last_edge)
+        # create networkx graph
+        nx_g = nx.Graph()
+        nx_g.add_edges_from(edges)
+        if not nx.is_connected(nx_g):
+            last_edge = edges[len(edges) - 1]
+        else:
+            last_edge = None
+    # found good graph, now create the pynauty version
+    vertices = set()
+    for edge in edges:
+        vertices.add(edge[0])
+        vertices.add(edge[1])
+    vertices_list = list(vertices)
+    g = Graph(len(vertices_list))
+    for edge in edges:
+        g.connect_vertex(vertices_list.index(edge[0]), vertices_list.index(edge[1]))
+    label = canon_label(g)
+    return label == c_parent
 
 
 def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
@@ -127,8 +164,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
                 for new_orig_edge in orig_edges:
                     g.connect_vertex(orig_vertices_list.index(new_orig_edge[0]), orig_vertices_list.index(new_orig_edge[1]))
                     edges.append((orig_vertices_list.index(new_orig_edge[0]), orig_vertices_list.index(new_orig_edge[1])))
-                label = certificate(g)
-                subgraphkplus1 = VsigramGraph(g, get_subgraph_hash(orig_edges), label, canon_label(g),
+                subgraphkplus1 = VsigramGraph(g, get_subgraph_hash(orig_edges), certificate(g), canon_label(g),
                                               edges=edges, vertices=range(len(orig_vertices_list)),
                                               orig_edges=orig_edges, orig_vertices=orig_vertices_list)
                 Skplus1.append(subgraphkplus1)
@@ -146,15 +182,15 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
         processed_subgraphs.add(skplus1.hash_str)
         # M(sk+1.label) = M(sk+1.label) + {sk+1} //add subgraph
         if skplus1.label not in MCLkplus1:
-            MCLkplus1[skplus1.label] = [skplus1]
+            MCLkplus1[skplus1.label_arr] = [skplus1]
         else:
-            MCLkplus1[skplus1.label].append(skplus1)
+            MCLkplus1[skplus1.label_arr].append(skplus1)
     # end for
     # for each clk+1 in CLk+1 do
     for clkplus1 in MCLkplus1.keys():
         # if clfk is not the generating parent of clk+1 then
-        # if False: # !generating_parent():  # generating parent function
-            # continue
+        if not generating_parent(clkplus1, clfk):  # generating parent function
+            continue
         # end if
         # compute clk+1.freq from M(clk+1)
         # if clk+1.freq < minFreq then

@@ -2,7 +2,6 @@ import datetime
 from pynauty import *
 import networkx as nx
 import csv
-
 from upc.bsc.grahanalysis.model.VsigramGraph import VsigramGraph
 
 
@@ -65,11 +64,10 @@ def vsigram(G, minFreq):
         subgraph1 = VsigramGraph(g, get_subgraph_hash([edge]), label=certificate(g), label_arr=canon_label(g),
                                  edges=edges_list, vertices=range(len(vertices_list)),
                                  orig_edges=[edge], orig_vertices=vertices_list)
-        if subgraph1.label not in MCLf1:
+        if subgraph1.label_arr not in MCLf1:
             MCLf1[subgraph1.label_arr] = [subgraph1]
         else:
             MCLf1[subgraph1.label_arr].append(subgraph1)
-        processed_subgraphs.add(subgraph1.hash_str)
 
     # for each clf1 in CLf1 do
     for key in MCLf1.keys():
@@ -90,11 +88,11 @@ def vsigram(G, minFreq):
         MCLf.update(vsigram_extend(clf1, MCLf1[clf1], G, minFreq, MCLf, 1+1))
     # end for
     # FINALLY CHECK ALL FREQUENCIES
-    print 'Starting to eliminate keys'
-    for key in MCLf.keys():
-        if len(MCLf[key]) < minFreq:
-            del MCLf[key]
-    # return MCLf
+    # print 'Starting to eliminate keys'
+    # for key in MCLf.keys():
+    #     if len(MCLf[key]) < minFreq:
+    #         del MCLf[key]
+    # # return MCLf
     return MCLf
 
 
@@ -110,16 +108,27 @@ def generating_parent(c_child, c_parent):
         in_edges = edges_line[1].strip().split(' ')
         for element in in_edges:
             in_edge = int(element)
-            edges.append((out_edge, in_edge))
+            if (out_edge < in_edge) and ((out_edge, in_edge) not in edges):
+                edges.append((out_edge, in_edge))
+            else:
+                if (in_edge, out_edge) not in edges:
+                    edges.append((in_edge, out_edge))
+
     # deleting last edge
-    last_edge = edges[len(edges) - 1]
-    while(last_edge is not None):
+    orig_edges = list(edges)
+    last_index = len(edges) - 1
+    last_edge = orig_edges[last_index]
+    while last_edge is not None:
+        edges = list(orig_edges)
         edges.remove(last_edge)
         # create networkx graph
         nx_g = nx.Graph()
         nx_g.add_edges_from(edges)
         if not nx.is_connected(nx_g):
-            last_edge = edges[len(edges) - 1]
+            print 'Graph is not connected'
+            last_index -= 1
+            print 'Last index is ' + str(last_index)
+            last_edge = orig_edges[last_index]
         else:
             last_edge = None
     # found good graph, now create the pynauty version
@@ -173,15 +182,8 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
     # ON THIS LEVEL CHECK IF THE SUBGRAPH HAS ALREADY BEEN PROCESSED AND DO NOT ADD IT IN THIS CASE!
     for skplus1 in Skplus1:
         # CLk+1 = CLk+1 + (sk+1.label) // only distinct canonical labels
-        # CHECK BASED ON ORIGINAL EDGES AND VERTICES IF THIS GRAPH HAS ALREADY BEEN PROCESSED
-        if skplus1.hash_str in processed_subgraphs:
-            # print 'Skipping the graph with hash: ' + skplus1.hash_str
-            continue
-
-        # IF IT'S A NEW SUBGRAPH, ADD IT TO THE SET AND DICTIONARY
-        processed_subgraphs.add(skplus1.hash_str)
         # M(sk+1.label) = M(sk+1.label) + {sk+1} //add subgraph
-        if skplus1.label not in MCLkplus1:
+        if skplus1.label_arr not in MCLkplus1:
             MCLkplus1[skplus1.label_arr] = [skplus1]
         else:
             MCLkplus1[skplus1.label_arr].append(skplus1)
@@ -190,13 +192,14 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
     for clkplus1 in MCLkplus1.keys():
         # if clfk is not the generating parent of clk+1 then
         if not generating_parent(clkplus1, clfk):  # generating parent function
+            print 'size: ' + str(size) + ', ' + clkplus1 + ' is NOT a child of ' + clfk
             continue
         # end if
+        print 'size: ' + str(size) + ', ' + clkplus1 + ' is a child of ' + clfk
         # compute clk+1.freq from M(clk+1)
         # if clk+1.freq < minFreq then
-        # HAVE TO CANCEL THIS STEP SINCE IT'S NOT CALCULATING FULL FREQUENCY
-        # if len(MCLkplus1[clkplus1]) < minFreq:
-            # continue
+        if len(MCLkplus1[clkplus1]) < minFreq:
+            continue
         # end if
         # CLf = CLf + {clk+1} + vsigram_extend(clk+1, G, minFreq)
         if clkplus1 not in MCLf:
@@ -210,10 +213,12 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
 
 start_time = datetime.datetime.now()
 print 'Start time is:' + str(start_time)
-processed_subgraphs = set()
 graph = map_csv_to_graph()
 frequent_subgraphs = vsigram(graph, 1)
 end_time = datetime.datetime.now()
 print 'End time is:' + str(end_time)
 print 'Elapsed: ' + str(end_time - start_time)
-print frequent_subgraphs
+print len(frequent_subgraphs)
+
+for pattern in frequent_subgraphs.keys():
+    print pattern + ': ' + str(len(frequent_subgraphs[pattern])) + ', edges: ' + str(len(frequent_subgraphs[pattern][0].edges))

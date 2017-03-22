@@ -15,6 +15,14 @@ class VsigramGraph:
         self._orig_vertices = orig_vertices
         self._hash_str = hash_str
 
+    def __hash__(self):
+        return hash(self.hash_str)
+
+    def __eq__(self, other):
+        # another object is equal to self, iff
+        # it is an instance of MyClass
+        return self.__hash__() == other.__hash__()
+
     @property
     def support_abs(self):
         return self._support_abs

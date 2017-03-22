@@ -9,14 +9,19 @@ import csv
 import sys
 
 
-def find_absolute_position(position, chromosome):
-    if chromosome == 'X':
+def chr_number(chr_str):
+    if chr_str == 'X':
         index = 22
     else:
-        if chromosome == 'Y':
+        if chr_str == 'Y':
             index = 23
         else:
-            index = int(chromosome) - 1
+            index = int(chr_str) - 1
+    return index
+
+
+def find_absolute_position(position, chromosome):
+    index = chr_number(chromosome)
     offset = 0L
     if index != 0:
         for i in range(index + 1):
@@ -24,22 +29,30 @@ def find_absolute_position(position, chromosome):
     return offset + long(position)
 
 
-def load_edges(path='/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv'):
+def load_edges_2d(path='/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv'):
     with open(path, 'rb') as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=['Chr_BKP_1', 'Pos_BKP_1', 'Chr_BKP_2', 'Pos_BKP_2'])
         next(csvfile)
         positions = []
         for row in reader:
-            positions.append((find_absolute_position(row['Pos_BKP_1'], row['Chr_BKP_1']), find_absolute_position(row['Pos_BKP_2'], row['Chr_BKP_2'])))
+            positions.append(((chr_number(row['Chr_BKP_1']), find_absolute_position(row['Pos_BKP_1'], row['Chr_BKP_1'])), (chr_number(row['Chr_BKP_2']), find_absolute_position(row['Pos_BKP_2'], row['Chr_BKP_2']))))
         return positions
 
 
-def convert_to_flat_array(edges):
-    positions = []
+def convert_to_2d_array(edges):
+    positions = dict()
     for edge in edges:
-        positions.append(edge[0])
-        positions.append(edge[1])
-    ds = sorted(set(map(float,positions)))
+        if edge[0][0] not in positions.keys():
+            positions[edge[0][0]] = {edge[0][1]}
+        else:
+            positions[edge[0][0]].add(edge[0][1])
+        if edge[1][0] not in positions.keys():
+            positions[edge[1][0]] = {edge[1][1]}
+        else:
+            positions[edge[1][0]].add(edge[1][1])
+    for key in positions.keys():
+        positions[key] = sorted(map(float, positions[key]))
+    ds = positions
     return ds
 
 
@@ -97,7 +110,6 @@ def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/
             writer.writerow({'pos_1': row[0], 'pos_2': row[1]})
 
 
-
 def write_lg_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/graph.lg'):
     f = open(path, 'w')
     f.write('# t 1\n')
@@ -137,69 +149,87 @@ CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
 
 bandwidth = 50000.0
 # read the positions from the largest sample
-edges = load_edges()
-ds = convert_to_flat_array(edges)
+edges = load_edges_2d()
+ds_collection = convert_to_2d_array(edges)
 
 
 x_plot_y = []
-for x in ds:
-    x_plot_y.append(func(ds, 0))
+for i in range(0, 24):
+    if i in ds_collection:
+        ds = ds_collection[i]
+        for x in ds:
+            x_plot_y.append(func(x, 0))
 fig, ax = plt.subplots(nrows=4, ncols=1, sharex=False, sharey=False, squeeze=True,
              subplot_kw=None, gridspec_kw=None, figsize=(20, 15))
 pyplot.title('Bandwidth = ' + str(int(bandwidth/1000)) + 'kbp, NmbPoints = ' + str(len(ds)))
 # scipy
-X = np.array(ds)
-X_res = X.reshape(-1,1)
-scipy_kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(X_res)
-log_dens = scipy_kde.score_samples(X_res)
-indexes_scipy = peakutils.indexes(np.exp(log_dens), thres=0.0, min_dist=0)
-ax[0].plot(X, np.exp(log_dens),  '-h', markevery=indexes_scipy)
-ax[0].plot(ds, x_plot_y, '+k')
-ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy)), xy=get_axis_limits(ax[0]))
+
+X_collection = []
+log_dens_collection = []
+indexes_scipy_collection = []
+index_offset = 0
+first_chr = True
+for i in range(0, 24):
+    if i in ds_collection:
+        ds = ds_collection[i]
+        X = np.array(ds)
+        X_collection.extend(X)
+        X_res = X.reshape(-1,1)
+        scipy_kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(X_res)
+        log_dens = scipy_kde.score_samples(X_res)
+        log_dens_collection.extend(log_dens)
+        indexes_scipy = peakutils.indexes(np.exp(log_dens), thres=0.0, min_dist=0)
+        for index_scipy in indexes_scipy:
+            indexes_scipy_collection.append(index_offset + index_scipy)
+        index_offset += len(X)
+        first_chr = False
+ax[0].plot(X_collection, np.exp(log_dens_collection),  '-h', markevery=indexes_scipy_collection)
+ax[0].plot(X_collection, x_plot_y, '+k')
+ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy_collection)), xy=get_axis_limits(ax[0]))
 
 
-# pyqt-fit
-# calculate density estimation
-est = kde.KDE1D(ds)
-#est.kernel = kernels.normal_kernel1d()
-est.bandwidth =bandwidth #10k window?
-estimation = est(ds)
-#est.lower = 25319510
-#est.upper = 120155230
-indexes = peakutils.indexes(estimation, thres=0.0, min_dist=0)
-#plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
-ax[1].plot(ds, estimation, '-h', markevery=indexes)
-ax[1].plot(ds, x_plot_y, '+k')
-ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes)), xy=get_axis_limits(ax[1]))
-
-# stastmodels.api without FFT
-dens_stats = sm.nonparametric.KDEUnivariate(ds)
-dens_stats.fit(bw=bandwidth, fft=False)
-indexes_stats = peakutils.indexes(dens_stats.density, thres=0.0, min_dist=0)
-
-ax[2].plot(dens_stats.support, dens_stats.density, '-h', markevery=indexes_stats)
-ax[2].plot(ds, x_plot_y, '+k')
-ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_stats)), xy=get_axis_limits(ax[2]))
-
-# stastmodels.api with FFT
-dens_stats_fft = sm.nonparametric.KDEUnivariate(ds)
-dens_stats_fft.fit(bw=bandwidth, fft=True)
-indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.3, min_dist=0)
-
-ax[3].plot(dens_stats_fft.support, dens_stats_fft.density, '-h', markevery=indexes_stats_fft)
-ax[3].plot(ds, x_plot_y, '+k')
-ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_stats_fft)), xy=get_axis_limits(ax[3]))
-
-
-
-
-
-
-
-# assign each point to closest peak and rewrite the edges
-new_assignment = construct_new_assignment(ds, indexes, edges)
-write_undirect_input_file(new_assignment)
-# write_xgraph_input_file(new_assignment)
-# write_lg_input_file(new_assignment)
+# # pyqt-fit
+# # calculate density estimation
+# est = kde.KDE1D(ds)
+# #est.kernel = kernels.normal_kernel1d()
+# est.bandwidth =bandwidth #10k window?
+# estimation = est(ds)
+# #est.lower = 25319510
+# #est.upper = 120155230
+# indexes = peakutils.indexes(estimation, thres=0.0, min_dist=0)
+# #plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
+# ax[1].plot(ds, estimation, '-h', markevery=indexes)
+# ax[1].plot(ds, x_plot_y, '+k')
+# ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes)), xy=get_axis_limits(ax[1]))
+#
+# # stastmodels.api without FFT
+# dens_stats = sm.nonparametric.KDEUnivariate(ds)
+# dens_stats.fit(bw=bandwidth, fft=False)
+# indexes_stats = peakutils.indexes(dens_stats.density, thres=0.0, min_dist=0)
+#
+# ax[2].plot(dens_stats.support, dens_stats.density, '-h', markevery=indexes_stats)
+# ax[2].plot(ds, x_plot_y, '+k')
+# ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_stats)), xy=get_axis_limits(ax[2]))
+#
+# # stastmodels.api with FFT
+# dens_stats_fft = sm.nonparametric.KDEUnivariate(ds)
+# dens_stats_fft.fit(bw=bandwidth, fft=True)
+# indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.09, min_dist=0)
+#
+# ax[3].plot(dens_stats_fft.support, dens_stats_fft.density, '-h', markevery=indexes_stats_fft)
+# ax[3].plot(ds, x_plot_y, '+k')
+# ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_stats_fft)), xy=get_axis_limits(ax[3]))
+#
+#
+#
+#
+#
+#
+#
+# # assign each point to closest peak and rewrite the edges
+# new_assignment = construct_new_assignment(ds, indexes, edges)
+# write_undirect_input_file(new_assignment)
+# # write_xgraph_input_file(new_assignment)
+# # write_lg_input_file(new_assignment)
 
 pyplot.show()

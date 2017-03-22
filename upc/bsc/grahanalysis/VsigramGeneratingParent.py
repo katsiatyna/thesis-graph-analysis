@@ -147,7 +147,7 @@ def generating_parent(c_child, c_parent):
 def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
     #print 'Processing size ' + str(size)
     # Sk+1 = NULL
-    Skplus1 = list()
+    Skplus1 = set()
     # CLk+1 = NULL  // stores new, distinct canonical labels
     MCLkplus1 = dict()
     # for each sk in M(clfk ) do
@@ -176,7 +176,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
                 subgraphkplus1 = VsigramGraph(g, get_subgraph_hash(orig_edges), certificate(g), canon_label(g),
                                               edges=edges, vertices=range(len(orig_vertices_list)),
                                               orig_edges=orig_edges, orig_vertices=orig_vertices_list)
-                Skplus1.append(subgraphkplus1)
+                Skplus1.add(subgraphkplus1)
     # end for
     # for each sk+1 in Sk+1
     # ON THIS LEVEL CHECK IF THE SUBGRAPH HAS ALREADY BEEN PROCESSED AND DO NOT ADD IT IN THIS CASE!
@@ -191,6 +191,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
     # for each clk+1 in CLk+1 do
     for clkplus1 in MCLkplus1.keys():
         # if clfk is not the generating parent of clk+1 then
+        print 'frequency of ' + clkplus1 + ' is ' + str(len(MCLkplus1[clkplus1]))
         if not generating_parent(clkplus1, clfk):  # generating parent function
             print 'size: ' + str(size) + ', ' + clkplus1 + ' is NOT a child of ' + clfk
             continue
@@ -198,6 +199,7 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
         print 'size: ' + str(size) + ', ' + clkplus1 + ' is a child of ' + clfk
         # compute clk+1.freq from M(clk+1)
         # if clk+1.freq < minFreq then
+
         if len(MCLkplus1[clkplus1]) < minFreq:
             continue
         # end if

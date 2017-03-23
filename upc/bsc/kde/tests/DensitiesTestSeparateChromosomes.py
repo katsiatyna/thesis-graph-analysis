@@ -29,7 +29,7 @@ def find_absolute_position(position, chromosome):
     return offset + long(position)
 
 
-def load_edges_2d(path='/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv'):
+def load_edges_2d(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/7d734d06-f2b1-4924-a201-620ac8084c49_positions.csv'):
     with open(path, 'rb') as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=['Chr_BKP_1', 'Pos_BKP_1', 'Chr_BKP_2', 'Pos_BKP_2'])
         next(csvfile)
@@ -160,15 +160,16 @@ for i in range(0, 24):
         for x in ds:
             x_plot_y.append(func(x, 0))
 fig, ax = plt.subplots(nrows=4, ncols=1, sharex=False, sharey=False, squeeze=True,
-             subplot_kw=None, gridspec_kw=None, figsize=(20, 15))
-pyplot.title('Bandwidth = ' + str(int(bandwidth/1000)) + 'kbp, NmbPoints = ' + str(len(ds)))
+             subplot_kw=None, gridspec_kw=None, figsize=(35, 15))
+pyplot.title('Bandwidth = ' + str(int(bandwidth/1000)) + 'kbp, NmbPoints = ' + str(len(x_plot_y)))
 # scipy
-
+print 'SciPy'
 X_collection = []
 log_dens_collection = []
 indexes_scipy_collection = []
 index_offset = 0
 first_chr = True
+margins = [0]
 for i in range(0, 24):
     if i in ds_collection:
         ds = ds_collection[i]
@@ -179,53 +180,107 @@ for i in range(0, 24):
         log_dens = scipy_kde.score_samples(X_res)
         log_dens_collection.extend(log_dens)
         indexes_scipy = peakutils.indexes(np.exp(log_dens), thres=0.0, min_dist=0)
+        print 'Chromosome ' + str(i) + ': ' + str(len(indexes_scipy)) + ' out of ' + str(len(ds)) + ' positions'
         for index_scipy in indexes_scipy:
             indexes_scipy_collection.append(index_offset + index_scipy)
         index_offset += len(X)
+        margins.append(index_offset - 1)
         first_chr = False
 ax[0].plot(X_collection, np.exp(log_dens_collection),  '-h', markevery=indexes_scipy_collection)
 ax[0].plot(X_collection, x_plot_y, '+k')
+ax[0].plot(X_collection, x_plot_y, '+r', markevery=margins)
 ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy_collection)), xy=get_axis_limits(ax[0]))
 
 
-# # pyqt-fit
-# # calculate density estimation
-# est = kde.KDE1D(ds)
-# #est.kernel = kernels.normal_kernel1d()
-# est.bandwidth =bandwidth #10k window?
-# estimation = est(ds)
-# #est.lower = 25319510
-# #est.upper = 120155230
-# indexes = peakutils.indexes(estimation, thres=0.0, min_dist=0)
-# #plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
-# ax[1].plot(ds, estimation, '-h', markevery=indexes)
-# ax[1].plot(ds, x_plot_y, '+k')
-# ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes)), xy=get_axis_limits(ax[1]))
-#
-# # stastmodels.api without FFT
-# dens_stats = sm.nonparametric.KDEUnivariate(ds)
-# dens_stats.fit(bw=bandwidth, fft=False)
-# indexes_stats = peakutils.indexes(dens_stats.density, thres=0.0, min_dist=0)
-#
-# ax[2].plot(dens_stats.support, dens_stats.density, '-h', markevery=indexes_stats)
-# ax[2].plot(ds, x_plot_y, '+k')
-# ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_stats)), xy=get_axis_limits(ax[2]))
-#
-# # stastmodels.api with FFT
-# dens_stats_fft = sm.nonparametric.KDEUnivariate(ds)
-# dens_stats_fft.fit(bw=bandwidth, fft=True)
-# indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.09, min_dist=0)
-#
-# ax[3].plot(dens_stats_fft.support, dens_stats_fft.density, '-h', markevery=indexes_stats_fft)
-# ax[3].plot(ds, x_plot_y, '+k')
-# ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_stats_fft)), xy=get_axis_limits(ax[3]))
-#
-#
-#
-#
-#
-#
-#
+# pyqt-fit
+# calculate density estimation
+print 'PyQT-Fit'
+X_collection = []
+dens_collection = []
+indexes_collection = []
+index_offset = 0
+first_chr = True
+for i in range(0, 24):
+    if i in ds_collection:
+        ds = ds_collection[i]
+        X_collection.extend(ds)
+        est = kde.KDE1D(ds)
+        #est.kernel = kernels.normal_kernel1d()
+        est.bandwidth =bandwidth #10k window?
+        estimation = est(ds)
+        dens_collection.extend(estimation)
+        #est.lower = 25319510
+        #est.upper = 120155230
+        indexes = peakutils.indexes(estimation, thres=0.0, min_dist=0)
+        print 'Chromosome ' + str(i) + ': ' + str(len(indexes))+ ' out of ' + str(len(ds)) + ' positions'
+        for index in indexes:
+            indexes_collection.append(index_offset + index)
+        index_offset += len(ds)
+        first_chr = False
+#plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
+ax[1].plot(X_collection, dens_collection, '-h', markevery=indexes_collection)
+ax[1].plot(X_collection, x_plot_y, '+k')
+ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[1]))
+
+# stastmodels.api without FFT
+print 'Stats no FFT'
+X_collection = []
+X_collection_sup = []
+dens_collection = []
+indexes_collection = []
+index_offset = 0
+first_chr = True
+for i in range(0, 24):
+    if i in ds_collection:
+        ds = ds_collection[i]
+        dens_stats = sm.nonparametric.KDEUnivariate(ds)
+        dens_stats.fit(bw=bandwidth, fft=False)
+        X_collection.extend(ds)
+        X_collection_sup.extend(dens_stats.support)
+        dens_collection.extend(dens_stats.density)
+        indexes_stats = peakutils.indexes(dens_stats.density, thres=0.0, min_dist=0)
+        print 'Chromosome ' + str(i) + ': ' + str(len(indexes_stats))+ ' out of ' + str(len(ds)) + ' positions'
+        for index in indexes_stats:
+            indexes_collection.append(index_offset + index)
+        index_offset += len(ds)
+        first_chr = False
+ax[2].plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
+ax[2].plot(X_collection, x_plot_y, '+k')
+ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[2]))
+
+# stastmodels.api with FFT
+print 'Stats FFT'
+X_collection = []
+X_collection_sup = []
+dens_collection = []
+indexes_collection = []
+index_offset = 0
+first_chr = True
+for i in range(0, 24):
+    if i in ds_collection:
+        ds = ds_collection[i]
+        X_collection.extend(ds)
+        dens_stats_fft = sm.nonparametric.KDEUnivariate(ds)
+        dens_stats_fft.fit(bw=bandwidth, fft=True)
+        X_collection_sup.extend(dens_stats_fft.support)
+        dens_collection.extend(dens_stats_fft.density)
+        indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.0, min_dist=0)
+        print 'Chromosome ' + str(i) + ': ' + str(len(indexes_stats_fft))+ ' out of ' + str(len(ds)) + ' positions'
+        for index in indexes_stats_fft:
+            indexes_collection.append(index_offset + index)
+        index_offset += len(ds)
+        first_chr = False
+
+ax[3].plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
+ax[3].plot(X_collection, x_plot_y, '+k')
+ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[3]))
+
+
+
+
+
+
+
 # # assign each point to closest peak and rewrite the edges
 # new_assignment = construct_new_assignment(ds, indexes, edges)
 # write_undirect_input_file(new_assignment)

@@ -24,7 +24,7 @@ def find_absolute_position(position, chromosome):
     return offset + long(position)
 
 
-def load_edges(path='/home/kkrasnas/Documents/thesis/pattern_mining/PositionsTest.csv'):
+def load_edges(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/7d734d06-f2b1-4924-a201-620ac8084c49_positions.csv'):
     with open(path, 'rb') as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=['Chr_BKP_1', 'Pos_BKP_1', 'Chr_BKP_2', 'Pos_BKP_2'])
         next(csvfile)
@@ -86,7 +86,7 @@ def write_xgraph_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pa
     f.close()
 
 
-def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv'):
+def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment.csv'):
     # write new assignment
     with open(path, 'wb') as csvfile:
         fieldnames = ['pos_1', 'pos_2']

@@ -32,13 +32,36 @@ sys.path.append("/usr/lib/spark/python/lib/py4j-0.10.4-src.zip")
 try:
     from pyspark import SparkContext
     from pyspark import SparkConf
+    from pyspark import SparkContext
+    from pyspark.streaming import StreamingContext
+    from pyspark.streaming.kafka import KafkaUtils
 
 except ImportError as e:
     print ("Error importing Spark Modules", e)
     sys.exit(1)
 
 
-def map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv'):
+def combinations_local(iterable, r):
+    # combinations('ABCD', 2) --> AB AC AD BC BD CD
+    # combinations(range(4), 3) --> 012 013 023 123
+    pool = tuple(iterable)
+    n = len(pool)
+    if r > n:
+        return
+    indices = range(r)
+    yield tuple(pool[i] for i in indices)
+    while True:
+        for i in reversed(range(r)):
+            if indices[i] != i + n - r:
+                break
+        else:
+            return
+        indices[i] += 1
+        for j in range(i+1, r):
+            indices[j] = indices[j-1] + 1
+        yield tuple(pool[i] for i in indices)
+
+def map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment.csv'):
     with open(path, 'rb') as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=['pos_1', 'pos_2'])
         next(csvfile)
@@ -87,8 +110,13 @@ def map_to_graph(combination):
     v_g = VsigramGraph(g, 'no_hash_needed', certificate(g), canon_label(g),
                        edges=new_edges, vertices=range(len(original_vertices)),
                        orig_edges=original_edges, orig_vertices=original_vertices)
-    subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
-    return (subgraph_collection.label, subgraph_collection)
+    nx_g = nx.Graph()
+    nx_g.add_edges_from(new_edges)
+    if nx.is_connected(nx_g):
+        subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
+    else:
+        subgraph_collection = None
+    return (subgraph_collection.label if subgraph_collection is not None else '', subgraph_collection)
 
 
 def update_subgraph_freq(a, b):
@@ -98,26 +126,35 @@ def update_subgraph_freq(a, b):
     return freq_object
 
 
-conf = SparkConf().setAppName('SubgraphMining').setMaster('local')
+def filter_by_connected(edges):
+    # create networkx graph
+    nx_g = nx.Graph()
+    nx_g.add_edges_from(edges)
+    return nx.is_connected(nx_g)
+
+
+conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
 sc = SparkContext(conf=conf)
 
 # load the edges and deduplicate them
 edges = map_csv_to_edges_list()
 
 
-for i in range(2, len(edges) + 1):
+
+
+for i in range(1, 3):
     # combinations = itertools.combinations(range(len(edges)), i)
-    combinations = itertools.combinations(edges, i)
-    # print list(combinations)
-    combinations_list = list(combinations)
+    combinations = combinations_local(edges, i)
+    print list(combinations)
+    #combinations_list = list(combinations)
     # print combinations_list
-    rdd_size = sc.parallelize(combinations_list)
-    rdd_list = rdd_size.collect()
+    rdd_size = sc.parallelize(combinations)
     # print 'rdd: ' + str(rdd_list)
 
     # create a graph from each list
     rdd_of_graphs = rdd_size.map(lambda combination: map_to_graph(combination))
-    counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+    rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
+    counts_by_label = rdd_filtered.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
     counts_by_label_list = counts_by_label.collect()
     for element in counts_by_label_list:
         print element[0] + ': FREQ is ' + str(element[1].freq)

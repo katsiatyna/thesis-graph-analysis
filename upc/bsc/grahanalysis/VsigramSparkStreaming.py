@@ -42,22 +42,22 @@ except ImportError as e:
 
 def map_to_graph(combination):
     # edges are list of tuples
-    from upc.bsc.grahanalysis.model.SubgraphCollection import SubgraphCollection
-    from upc.bsc.grahanalysis.model.VsigramGraph import VsigramGraph
+    from SubgraphCollection import SubgraphCollection
+    from VsigramGraph import VsigramGraph
     p = re.compile('\(\d+, \d+\)')
     # only taking value
     original_edges_str = combination[1]
-    print 'COMBINATIONS ARE ' + str(original_edges_str) + ' ' + str(type(original_edges_str))
+    # print 'COMBINATIONS ARE ' + str(original_edges_str) + ' ' + str(type(original_edges_str))
     matched = p.findall(original_edges_str)
-    print 'MATCHES ARE ' + str(matched)
+    #print 'MATCHES ARE ' + str(matched)
     p = re.compile('\d+')
     original_edges = list()
     for match in matched:
         vertices = p.findall(match)
-        original_edges.append((vertices[0], vertices[1]))
+        original_edges.append((int(vertices[0]), int(vertices[1])))
     original_vertices = set()
     for edge in original_edges:
-        print 'EDGE is ' + str(edge) + ' ' + str(type(edge))
+        # print 'EDGE is ' + str(edge) + ' ' + str(type(edge))
         original_vertices.add(edge[0])
         original_vertices.add(edge[1])
     original_vertices = list(original_vertices)
@@ -79,7 +79,7 @@ def map_to_graph(combination):
 
 
 def update_subgraph_freq(a, b):
-    from upc.bsc.grahanalysis.model.SubgraphCollection import SubgraphCollection
+    from SubgraphCollection import SubgraphCollection
     freq_object = SubgraphCollection(label=a.label)
     freq_object.subgraphs = a.subgraphs + b.subgraphs
     freq_object.freq = a.freq + b.freq
@@ -93,21 +93,23 @@ def filter_by_connected(edges):
     return nx.is_connected(nx_g)
 
 def main(ssc):
-    directKafkaStream = KafkaUtils.createDirectStream(ssc, ['subgraphs11'], {"metadata.broker.list": 'localhost:9092'})
-
+    directKafkaStream = KafkaUtils.createDirectStream(ssc, ['subgraphs'], {"metadata.broker.list": 'localhost:9092'})
     # create a graph from each list
     rdd_of_graphs = directKafkaStream.map(lambda combination: map_to_graph(combination))
     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
     counts_by_label = rdd_filtered.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+    counts_by_label.pprint()
     # # counts_by_label_list = counts_by_label.collect()
     # # for element in counts_by_label_list:
     #     # print element[0] + ': FREQ is ' + str(element[1].freq)
-    counts_by_label.pprint()
+    # counts_by_label.pprint()
     ssc.start()
     ssc.awaitTermination()
 
 if __name__ == "__main__":
-    sc = SparkContext("local[*]", "SubgraphMining")
-    ssc = StreamingContext(sc, 1)
+    sc = SparkContext("local[*]", "SubgraphMining",
+                      pyFiles=['/home/kkrasnas/PycharmProjects/thesis-graph-analysis/upc/bsc/grahanalysis/SubgraphCollection.py',
+                               '/home/kkrasnas/PycharmProjects/thesis-graph-analysis/upc/bsc/grahanalysis/VsigramGraph.py'])
+    ssc = StreamingContext(sc, 5)
     main(ssc)
 

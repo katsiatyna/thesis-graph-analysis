@@ -59,11 +59,12 @@ producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
 
 # load the edges and deduplicate them
 edges = map_csv_to_edges_list()
-for i in range(1, 3):
+for i in range(1, 4):
     # combinations = itertools.combinations(range(len(edges)), i)
     combinations = combinations_local(edges, i)
     for comb in combinations:
-        producer.send('subgraphs11', key=str(i), value=str(comb))
+        # FIRST CHECK IF THE RESULTING GRAPH IS CONNECTED, ONLY THEN SEND
+        producer.send('subgraphs', key=str(i), value=str(comb))
 
 
 # block until all async messages are sent

@@ -95,7 +95,6 @@ def map_to_graph(combination):
     # edges are list of tuples
 
     # this is going to be the key
-    canonical = ''
     original_edges = combination
     original_vertices = set()
     for edge in original_edges:
@@ -126,11 +125,31 @@ def update_subgraph_freq(a, b):
     return freq_object
 
 
-def filter_by_connected(edges):
+def filter_by_connected(edges_indexes, orig_edges):
     # create networkx graph
+    edge_new = edges_indexes[len(edges_indexes) - 1]
+    edges_old = list(edges_indexes[0:len(edges_indexes) - 2]) if type(edges_indexes[0:len(edges_indexes) - 2]) is list \
+        else [edges_indexes[0:len(edges_indexes) - 2]]
+    # print str(edges_old) + str(type(edges_old))
+    # print str(edge_new) + str(type(edge_new))
+    if edge_new in edges_old:
+        # print 'REPEATING EDGE'
+        return False
+    edges_list = list()
+    for ind in list(edges_indexes):
+        edges_list.append(orig_edges[ind])
+    # print edges_list
     nx_g = nx.Graph()
-    nx_g.add_edges_from(edges)
+    nx_g.add_edges_from(edges_list)
     return nx.is_connected(nx_g)
+
+
+def mapToList(edges_indexes):
+    tupl_to_list = list(edges_indexes[0]) if type(edges_indexes[0]) is list else [edges_indexes[0]]
+    tupl_to_list.append(edges_indexes[1])
+    # print 'LIST: ' + str(tupl_to_list)
+    return tupl_to_list
+
 
 
 conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
@@ -140,28 +159,33 @@ sc = SparkContext(conf=conf)
 edges = map_csv_to_edges_list()
 
 
+rdd_1 = sc.parallelize(range(len(edges)))
+print(rdd_1.collect())
+rdds = list()
+rdds.append(rdd_1)
 
 
-for i in range(1, len(edges) + 1):
-    # combinations = itertools.combinations(range(len(edges)), i)
-    combinations = combinations_local(edges, i)
-    #combinations_list = list(combinations)
-    combinations_list = list()
-    for comb in combinations:
-        new_edges = list(comb)
-        nx_g = nx.Graph()
-        nx_g.add_edges_from(new_edges)
-        # FIRST CHECK IF THE RESULTING GRAPH IS CONNECTED, ONLY THEN SEND
-        if nx.is_connected(nx_g):
-            combinations_list.append(comb)
-    print len(combinations_list)
-    rdd_size = sc.parallelize(combinations_list)
-    # print 'rdd: ' + str(rdd_list)
+for i in range(2, 4):
+    print 'SIZE ' + str(i)
+    # for each element in rdd_1 create a list and add to new rdd
+    rdd_last = rdds[len(rdds) - 1]
+    rdd_next = rdd_last.cartesian(rdd_1)
+    print rdd_next.first()
+    # rdd_next = rdd_next.flatMap(lambda x: [element for tupl in x for element in tupl])
+    # filter the connected graphs
+    rdd_next = rdd_next.map(lambda x: mapToList(x))
+    rdd_next = rdd_next.filter(lambda comb: filter_by_connected(comb, edges))
 
-    # create a graph from each list
-    rdd_of_graphs = rdd_size.map(lambda combination: map_to_graph(combination))
-    rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
-    counts_by_label = rdd_filtered.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
-    counts_by_label_list = counts_by_label.collect()
-    for element in counts_by_label_list:
-        print element[0] + ': FREQ is ' + str(element[1].freq)
+    print rdd_next.collect()
+    rdds.append(rdd_next)
+#     # combinations = itertools.combinations(range(len(edges)), i)
+#     rdd_size = sc.parallelize(combinations_list)
+#     # print 'rdd: ' + str(rdd_list)
+#
+#     # create a graph from each list
+#     rdd_of_graphs = rdd_size.map(lambda combination: map_to_graph(combination))
+#     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
+#     counts_by_label = rdd_filtered.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+#     counts_by_label_list = counts_by_label.collect()
+#     for element in counts_by_label_list:
+#         print element[0] + ': FREQ is ' + str(element[1].freq)

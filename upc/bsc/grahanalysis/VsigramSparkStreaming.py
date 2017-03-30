@@ -69,12 +69,12 @@ def map_to_graph(combination):
     v_g = VsigramGraph(g, 'no_hash_needed', certificate(g), canon_label(g),
                        edges=new_edges, vertices=range(len(original_vertices)),
                        orig_edges=original_edges, orig_vertices=original_vertices)
-    nx_g = nx.Graph()
-    nx_g.add_edges_from(new_edges)
-    if nx.is_connected(nx_g):
-        subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
-    else:
-        subgraph_collection = None
+    # nx_g = nx.Graph()
+    # nx_g.add_edges_from(new_edges)
+    # if nx.is_connected(nx_g):
+    subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
+    # else:
+        # subgraph_collection = None
     return (subgraph_collection.label if subgraph_collection is not None else '', subgraph_collection)
 
 
@@ -93,16 +93,16 @@ def filter_by_connected(edges):
     return nx.is_connected(nx_g)
 
 def main(ssc):
-    directKafkaStream = KafkaUtils.createDirectStream(ssc, ['subgraphs'], {"metadata.broker.list": 'localhost:9092'})
+    directKafkaStream = KafkaUtils.createDirectStream(ssc, ['subgraphs1'], {"metadata.broker.list": 'localhost:9092'})
     # create a graph from each list
     rdd_of_graphs = directKafkaStream.map(lambda combination: map_to_graph(combination))
-    rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
-    counts_by_label = rdd_filtered.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+    # rdd_combined = rdd_of_graphs.filter(lambda x: x[1] is not None)
+    # rdd_separate = rdd_of_graphs.filter(lambda x: x[1] is None)
+    # rdd_combined.count().pprint()
+    # rdd_separate.count().pprint()
+    # rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
+    counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
     counts_by_label.pprint()
-    # # counts_by_label_list = counts_by_label.collect()
-    # # for element in counts_by_label_list:
-    #     # print element[0] + ': FREQ is ' + str(element[1].freq)
-    # counts_by_label.pprint()
     ssc.start()
     ssc.awaitTermination()
 

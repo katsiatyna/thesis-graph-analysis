@@ -3,6 +3,8 @@ from kafka.errors import KafkaError
 import logging as log
 import csv
 from pynauty import *
+import datetime
+import networkx as nx
 
 
 def combinations_local(iterable, r):
@@ -60,12 +62,17 @@ producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
 # load the edges and deduplicate them
 edges = map_csv_to_edges_list()
 for i in range(1, 4):
+    print 'Start time for size ' + str(i) + ' is ' + str(datetime.datetime.now())
     # combinations = itertools.combinations(range(len(edges)), i)
     combinations = combinations_local(edges, i)
     for comb in combinations:
+        new_edges = list(comb)
+        nx_g = nx.Graph()
+        nx_g.add_edges_from(new_edges)
         # FIRST CHECK IF THE RESULTING GRAPH IS CONNECTED, ONLY THEN SEND
-        producer.send('subgraphs', key=str(i), value=str(comb))
-
+        if nx.is_connected(nx_g):
+            producer.send('subgraphs1', key=str(i), value=str(comb))
+    print 'Size ' + str(i) + ' is done, time is ' + str(datetime.datetime.now())
 
 # block until all async messages are sent
 producer.flush()

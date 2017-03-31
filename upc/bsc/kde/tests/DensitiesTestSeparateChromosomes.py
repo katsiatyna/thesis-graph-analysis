@@ -52,8 +52,7 @@ def convert_to_2d_array(edges):
             positions[edge[1][0]].add(edge[1][1])
     for key in positions.keys():
         positions[key] = sorted(map(float, positions[key]))
-    ds = positions
-    return ds
+    return positions
 
 
 def diff(pos, peak):
@@ -69,6 +68,15 @@ def find_closest_peak(i, peak_indexes):
             closest_peak = peak
     return closest_peak
 
+def find_closest_peak_fft(pos, support_pos, peak_indexes):
+    min_diff = sys.maxint
+    new_pos = pos
+    for peak in peak_indexes:
+        if(diff(pos, support_pos[peak]) < min_diff):
+            min_diff = diff(pos, support_pos[peak])
+            new_pos = support_pos[peak]
+    return new_pos
+
 
 def construct_new_assignment(original_pos, peak_indexes, edges):
     new_assignment = []
@@ -77,8 +85,12 @@ def construct_new_assignment(original_pos, peak_indexes, edges):
                                original_pos[find_closest_peak(original_pos.index(float(edge[1])), peak_indexes)]))
     return new_assignment
 
-def construct_new_assignment_fft(original_pos, peak_indexes, edges):
-    pass
+def construct_new_assignment_fft(original_pos, support_pos, peak_indexes):
+    new_assignment = dict()
+    for pos in original_pos:
+        new_pos = find_closest_peak_fft(pos, support_pos, peak_indexes)
+        new_assignment[pos] = new_pos
+    return new_assignment
 
 
 def func(x, return_val):
@@ -146,7 +158,8 @@ CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
            135006516, 133851895, 115169878, 107349540, 102531392,
            90354753, 81195210, 78077248, 59128983, 63025520,
            48129895, 51304566, 155270560, 59373566]
-
+mode_separate = True
+chrom = 0
 bandwidth = 50000.0
 # read the positions from the largest sample
 edges = load_edges_2d()
@@ -154,19 +167,27 @@ ds_collection = convert_to_2d_array(edges)
 
 
 x_plot_y = []
+x_plot_y_sep = []
 for i in range(0, 24):
     if i in ds_collection:
         ds = ds_collection[i]
+        x_plot_y_sep_tmp = []
         for x in ds:
-            x_plot_y.append(func(x, 0))
+            y = func(x, 0)
+            x_plot_y.append(y)
+            x_plot_y_sep_tmp.append(y)
+        x_plot_y_sep.append(x_plot_y_sep_tmp)
 fig, ax = plt.subplots(nrows=4, ncols=1, sharex=False, sharey=False, squeeze=True,
              subplot_kw=None, gridspec_kw=None, figsize=(35, 15))
 pyplot.title('Bandwidth = ' + str(int(bandwidth/1000)) + 'kbp, NmbPoints = ' + str(len(x_plot_y)))
 # scipy
 print 'SciPy'
 X_collection = []
+X_collection_sep = []
 log_dens_collection = []
+log_dens_collection_sep = []
 indexes_scipy_collection = []
+indexes_scipy_collection_sep = []
 index_offset = 0
 first_chr = True
 margins = [0]
@@ -175,59 +196,84 @@ for i in range(0, 24):
         ds = ds_collection[i]
         X = np.array(ds)
         X_collection.extend(X)
+        X_collection_sep.append(X)
         X_res = X.reshape(-1,1)
         scipy_kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(X_res)
         log_dens = scipy_kde.score_samples(X_res)
         log_dens_collection.extend(log_dens)
+        log_dens_collection_sep.append(log_dens)
         indexes_scipy = peakutils.indexes(np.exp(log_dens), thres=0.0, min_dist=0)
         print 'Chromosome ' + str(i) + ': ' + str(len(indexes_scipy)) + ' out of ' + str(len(ds)) + ' positions'
+        indexes_scipy_collection_sep.append(indexes_scipy)
         for index_scipy in indexes_scipy:
             indexes_scipy_collection.append(index_offset + index_scipy)
         index_offset += len(X)
         margins.append(index_offset - 1)
         first_chr = False
-ax[0].plot(X_collection, np.exp(log_dens_collection),  '-h', markevery=indexes_scipy_collection)
-ax[0].plot(X_collection, x_plot_y, '+k')
-ax[0].plot(X_collection, x_plot_y, '+r', markevery=margins)
-ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy_collection)), xy=get_axis_limits(ax[0]))
+
+if(mode_separate):
+    ax[0].plot(X_collection_sep[chrom], np.exp(log_dens_collection_sep[chrom]),  '-h', markevery=indexes_scipy_collection_sep[chrom])
+    ax[0].plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
+    # ax[0].plot(X_collection, x_plot_y, '+r', markevery=margins)
+    ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy_collection_sep[chrom])), xy=get_axis_limits(ax[0]))
+else:
+    ax[0].plot(X_collection, np.exp(log_dens_collection),  '-h', markevery=indexes_scipy_collection)
+    ax[0].plot(X_collection, x_plot_y, '+k')
+    # ax[0].plot(X_collection, x_plot_y, '+r', markevery=margins)
+    ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy_collection)), xy=get_axis_limits(ax[0]))
 
 
 # pyqt-fit
 # calculate density estimation
 print 'PyQT-Fit'
 X_collection = []
+X_collection_sep = []
 dens_collection = []
+dens_collection_sep = []
 indexes_collection = []
+indexes_collection_sep = []
 index_offset = 0
 first_chr = True
 for i in range(0, 24):
     if i in ds_collection:
         ds = ds_collection[i]
         X_collection.extend(ds)
+        X_collection_sep.append(ds)
         est = kde.KDE1D(ds)
         #est.kernel = kernels.normal_kernel1d()
         est.bandwidth =bandwidth #10k window?
         estimation = est(ds)
         dens_collection.extend(estimation)
+        dens_collection_sep.append(estimation)
         #est.lower = 25319510
         #est.upper = 120155230
         indexes = peakutils.indexes(estimation, thres=0.0, min_dist=0)
+        indexes_collection_sep.append(indexes)
         print 'Chromosome ' + str(i) + ': ' + str(len(indexes))+ ' out of ' + str(len(ds)) + ' positions'
         for index in indexes:
             indexes_collection.append(index_offset + index)
         index_offset += len(ds)
         first_chr = False
 #plt.plot(ds, est(ds), label='Estimate (bw={:.3g})'.format(est.bandwidth))
-ax[1].plot(X_collection, dens_collection, '-h', markevery=indexes_collection)
-ax[1].plot(X_collection, x_plot_y, '+k')
-ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[1]))
+if mode_separate:
+    ax[1].plot(X_collection_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
+    ax[1].plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
+    ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])), xy=get_axis_limits(ax[1]))
+else:
+    ax[1].plot(X_collection, dens_collection, '-h', markevery=indexes_collection)
+    ax[1].plot(X_collection, x_plot_y, '+k')
+    ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[1]))
 
 # stastmodels.api without FFT
 print 'Stats no FFT'
 X_collection = []
+X_collection_sep = []
 X_collection_sup = []
+X_collection_sup_sep = []
 dens_collection = []
+dens_collection_sep = []
 indexes_collection = []
+indexes_collection_sep = []
 index_offset = 0
 first_chr = True
 for i in range(0, 24):
@@ -236,44 +282,65 @@ for i in range(0, 24):
         dens_stats = sm.nonparametric.KDEUnivariate(ds)
         dens_stats.fit(bw=bandwidth, fft=False)
         X_collection.extend(ds)
+        X_collection_sep.append(ds)
         X_collection_sup.extend(dens_stats.support)
+        X_collection_sup_sep.append(dens_stats.support)
         dens_collection.extend(dens_stats.density)
+        dens_collection_sep.append(dens_stats.density)
         indexes_stats = peakutils.indexes(dens_stats.density, thres=0.0, min_dist=0)
+        indexes_collection_sep.append(indexes_stats)
         print 'Chromosome ' + str(i) + ': ' + str(len(indexes_stats))+ ' out of ' + str(len(ds)) + ' positions'
         for index in indexes_stats:
             indexes_collection.append(index_offset + index)
         index_offset += len(ds)
         first_chr = False
-ax[2].plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
-ax[2].plot(X_collection, x_plot_y, '+k')
-ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[2]))
+if mode_separate:
+    ax[2].plot(X_collection_sup_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
+    ax[2].plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
+    ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])), xy=get_axis_limits(ax[2]))
+else:
+    ax[2].plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
+    ax[2].plot(X_collection, x_plot_y, '+k')
+    ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[2]))
 
 # stastmodels.api with FFT
 print 'Stats FFT'
 X_collection = []
+X_collection_sep = []
 X_collection_sup = []
+X_collection_sup_sep = []
 dens_collection = []
+dens_collection_sep = []
 indexes_collection = []
+indexes_collection_sep = []
 index_offset = 0
 first_chr = True
 for i in range(0, 24):
     if i in ds_collection:
         ds = ds_collection[i]
         X_collection.extend(ds)
+        X_collection_sep.append(ds)
         dens_stats_fft = sm.nonparametric.KDEUnivariate(ds)
         dens_stats_fft.fit(bw=bandwidth, fft=True)
         X_collection_sup.extend(dens_stats_fft.support)
+        X_collection_sup_sep.append(dens_stats_fft.support)
         dens_collection.extend(dens_stats_fft.density)
+        dens_collection_sep.append(dens_stats_fft.density)
         indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.0, min_dist=0)
+        indexes_collection_sep.append(indexes_stats_fft)
         print 'Chromosome ' + str(i) + ': ' + str(len(indexes_stats_fft))+ ' out of ' + str(len(ds)) + ' positions'
         for index in indexes_stats_fft:
             indexes_collection.append(index_offset + index)
         index_offset += len(ds)
         first_chr = False
-
-ax[3].plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
-ax[3].plot(X_collection, x_plot_y, '+k')
-ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[3]))
+if mode_separate:
+    ax[3].plot(X_collection_sup_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
+    ax[3].plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
+    ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])), xy=get_axis_limits(ax[3]))
+else:
+    ax[3].plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
+    ax[3].plot(X_collection, x_plot_y, '+k')
+    ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[3]))
 
 
 
@@ -283,6 +350,13 @@ ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_a
 
 # # assign each point to closest peak and rewrite the edges
 # new_assignment = construct_new_assignment(ds, indexes, edges)
+new_assignment = dict()
+for i in range(len(ds_collection)):
+    new_assignment.update(construct_new_assignment_fft(X_collection_sep[i], X_collection_sup_sep[i], indexes_collection_sep[i]))
+new_edges = []
+for edge in edges:
+    new_edges.append((new_assignment[float(edge[0][1])], new_assignment[float(edge[1][1])]))
+print new_edges
 # write_undirect_input_file(new_assignment)
 # # write_xgraph_input_file(new_assignment)
 # # write_lg_input_file(new_assignment)

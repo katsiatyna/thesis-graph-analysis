@@ -111,11 +111,9 @@ def map_to_graph(combination, edges):
     for edge in original_edges:
         g.connect_vertex(original_vertices.index(edge[0]), original_vertices.index(edge[1]))
         new_edges.append((original_vertices.index(edge[0]), original_vertices.index(edge[1])))
-    v_g = VsigramGraph(g, 'no_hash_needed', certificate(g), canon_label(g),
-                       edges=new_edges, vertices=range(len(original_vertices)),
-                       orig_edges=original_edges, orig_vertices=original_vertices)
+    v_g = VsigramGraph(g, None, label_arr=canon_label(g), orig_edges=original_edges)
     subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
-    return (subgraph_collection.label if subgraph_collection is not None else '', subgraph_collection)
+    return (subgraph_collection.label, subgraph_collection)
 
 
 def update_subgraph_freq(a, b):

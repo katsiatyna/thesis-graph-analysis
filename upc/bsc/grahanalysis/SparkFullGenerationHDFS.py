@@ -21,8 +21,8 @@ from networkx.drawing.nx_agraph import write_dot
 #os.environ['SPARK_HOME'] = "/usr/lib/spark"
 # os.environ['SPARK_HOME'] = "/home/jie/d2/spark-0.9.1"
 # Append to PYTHONPATH so that pyspark could be found
-from SubgraphCollection import SubgraphCollection
-from VsigramGraph import VsigramGraph
+# from SubgraphCollection import SubgraphCollection
+# from VsigramGraph import VsigramGraph
 
 sys.path.append("/usr/lib/spark/python")
 sys.path.append("/usr/lib/spark/python/lib/py4j-0.10.4-src.zip")
@@ -111,8 +111,8 @@ def map_to_graph(combination, edges):
     for edge in original_edges:
         g.connect_vertex(original_vertices.index(edge[0]), original_vertices.index(edge[1]))
         new_edges.append((original_vertices.index(edge[0]), original_vertices.index(edge[1])))
-    v_g = VsigramGraph(g, None, label_arr=canon_label(g), orig_edges=original_edges)
-    subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
+    # v_g = VsigramGraph(g, None, label_arr=canon_label(g), orig_edges=original_edges)
+    # subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
     return (canon_label(g), (1, [original_edges]))
 
 
@@ -157,8 +157,7 @@ def mapToList(edges_indexes):
 
 
 conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
-sc = SparkContext(conf=conf, pyFiles=['/home/kkrasnas/PycharmProjects/thesis-graph-analysis/upc/bsc/grahanalysis/SubgraphCollection.py',
-                               '/home/kkrasnas/PycharmProjects/thesis-graph-analysis/upc/bsc/grahanalysis/VsigramGraph.py'])
+sc = SparkContext(conf=conf)
 
 # load the edges and deduplicate them
 edges = map_csv_to_edges_list()

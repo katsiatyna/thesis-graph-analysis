@@ -35,7 +35,10 @@ def load_edges_2d(path='/home/kkrasnas/Documents/thesis/pattern_mining/validatio
         next(csvfile)
         positions = []
         for row in reader:
-            positions.append(((chr_number(row['Chr_BKP_1']), find_absolute_position(row['Pos_BKP_1'], row['Chr_BKP_1'])), (chr_number(row['Chr_BKP_2']), find_absolute_position(row['Pos_BKP_2'], row['Chr_BKP_2']))))
+            positions.append(((chr_number(row['Chr_BKP_1']),
+                               find_absolute_position(row['Pos_BKP_1'], row['Chr_BKP_1'])),
+                              (chr_number(row['Chr_BKP_2']),
+                               find_absolute_position(row['Pos_BKP_2'], row['Chr_BKP_2']))))
         return positions
 
 
@@ -111,7 +114,7 @@ def write_xgraph_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pa
     f.close()
 
 
-def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv'):
+def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv'):
     # write new assignment
     with open(path, 'wb') as csvfile:
         fieldnames = ['pos_1', 'pos_2']
@@ -139,27 +142,14 @@ def write_lg_input_file(assignment, path='/home/kkrasnas/Documents/thesis/patter
 
     f.close()
 
-# ds = sorted(map(float, [80407479,50425934,82653054,132506654,132512574,8137459,8137565,55013506,21479214,41670179,43294258,45820099,
-#                  45864568,45880888,47120476,104483915,41745869,32087843,85867303,86386946,7537761,59316711,71262976,55866224,
-#                  185147302,234917206,234917491,24489763,24755242,30971243,39867712,39883066,11421883,11836267,29602419,115902151,
-#                  116239951,119250739,121536351,121536416,112891331,170706563,47174222,111733407,4188644,4357547,36146852,
-#                  57974035,61873557,62262194,66027930,83251943,141212309,25319512,26175897,26179530,26180930,32931461,41833641,
-#                  100418583,120152091,71813442,71813782,58109172,80410698,50429962,82655509,53374859,134457664,124070384,
-#                         124070269,4344156,16887282,41707033,10089846,41686214,68397217,12626390,42584288,104485559,41748503,
-#                         28193653,86711648,87254181,8091000,59368935,41709592,16764011,185149442,42851895,42870301,24776966,28210105,
-#                         30996135,42872048,42871868,193409197,194134696,86761278,144636867,118612945,151685509,144990021,
-#                         144990143,112893006,170708906,47199123,111964714,4266657,4360229,36189429,57975730,61875756,62265611,
-#                         91154657,83253194,141224270,32935734,32930323,32929935,32934432,32934337,42831908,100420068,120155220,
-#                         89952391,89952299,58110742]))
-
 # info chromosome
 CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
            171115067, 159138663, 146364022, 141213431, 135534747,
            135006516, 133851895, 115169878, 107349540, 102531392,
            90354753, 81195210, 78077248, 59128983, 63025520,
            48129895, 51304566, 155270560, 59373566]
-mode_separate = True
-chrom = 0
+mode_separate = False
+chrom = 11
 bandwidth = 50000.0
 # read the positions from the largest sample
 edges = load_edges_2d()
@@ -189,7 +179,6 @@ log_dens_collection_sep = []
 indexes_scipy_collection = []
 indexes_scipy_collection_sep = []
 index_offset = 0
-first_chr = True
 margins = [0]
 for i in range(0, 24):
     if i in ds_collection:
@@ -197,7 +186,7 @@ for i in range(0, 24):
         X = np.array(ds)
         X_collection.extend(X)
         X_collection_sep.append(X)
-        X_res = X.reshape(-1,1)
+        X_res = X.reshape(-1, 1)
         scipy_kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(X_res)
         log_dens = scipy_kde.score_samples(X_res)
         log_dens_collection.extend(log_dens)
@@ -209,7 +198,6 @@ for i in range(0, 24):
             indexes_scipy_collection.append(index_offset + index_scipy)
         index_offset += len(X)
         margins.append(index_offset - 1)
-        first_chr = False
 
 if(mode_separate):
     ax[0].plot(X_collection_sep[chrom], np.exp(log_dens_collection_sep[chrom]),  '-h', markevery=indexes_scipy_collection_sep[chrom])
@@ -233,7 +221,6 @@ dens_collection_sep = []
 indexes_collection = []
 indexes_collection_sep = []
 index_offset = 0
-first_chr = True
 for i in range(0, 24):
     if i in ds_collection:
         ds = ds_collection[i]
@@ -275,7 +262,6 @@ dens_collection_sep = []
 indexes_collection = []
 indexes_collection_sep = []
 index_offset = 0
-first_chr = True
 for i in range(0, 24):
     if i in ds_collection:
         ds = ds_collection[i]
@@ -314,7 +300,6 @@ dens_collection_sep = []
 indexes_collection = []
 indexes_collection_sep = []
 index_offset = 0
-first_chr = True
 for i in range(0, 24):
     if i in ds_collection:
         ds = ds_collection[i]
@@ -343,11 +328,6 @@ else:
     ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[3]))
 
 
-
-
-
-
-
 # # assign each point to closest peak and rewrite the edges
 # new_assignment = construct_new_assignment(ds, indexes, edges)
 new_assignment = dict()
@@ -356,8 +336,8 @@ for i in range(len(ds_collection)):
 new_edges = []
 for edge in edges:
     new_edges.append((new_assignment[float(edge[0][1])], new_assignment[float(edge[1][1])]))
-print new_edges
-# write_undirect_input_file(new_assignment)
+# print new_edges
+# write_undirect_input_file(new_edges)
 # # write_xgraph_input_file(new_assignment)
 # # write_lg_input_file(new_assignment)
 

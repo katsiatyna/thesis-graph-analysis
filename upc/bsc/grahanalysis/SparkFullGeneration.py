@@ -178,6 +178,7 @@ for i in range(2, 6):
     # for each element in rdd_1 create a list and add to new rdd
     rdd_last = rdds[len(rdds) - 1]
     rdd_next = rdd_last.cartesian(rdd_1)
+    rdd_next.explain()
     print rdd_next.first()
     # rdd_next = rdd_next.flatMap(lambda x: [element for tupl in x for element in tupl])
     # filter the connected graphs

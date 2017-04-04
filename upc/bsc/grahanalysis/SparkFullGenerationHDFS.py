@@ -160,7 +160,7 @@ conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
 sc = SparkContext(conf=conf)
 
 # load the edges and deduplicate them
-edges = map_csv_to_edges_list()
+edges = map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv')
 sample = '7d734d06-f2b1-4924-a201-620ac8084c49'
 
 rdd_1 = sc.parallelize(range(len(edges)))

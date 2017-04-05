@@ -170,6 +170,7 @@ counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_fre
 counts_by_label_list_1 = counts_by_label_1.collect()
 counts_by_label_1.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(1))
 rdds = list()
+sc.broadcast(rdd_1.collect())
 rdds.append(rdd_1)
 
 for i in range(2, 6):

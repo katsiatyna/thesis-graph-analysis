@@ -8,6 +8,12 @@ import numpy as np
 from pynauty import *
 import re
 import networkx as nx
+import matplotlib.pyplot as plt
+import pylab
+import pydot
+import pygraphviz
+from networkx.drawing.nx_agraph import graphviz_layout
+from networkx.drawing.nx_agraph import write_dot
 
 
 # Set the path for spark installation
@@ -24,16 +30,11 @@ sys.path.append("/usr/lib/spark/python/lib/py4j-0.10.4-src.zip")
 
 # Now we are ready to import Spark Modules
 try:
+    from pyspark import SparkContext
     from pyspark import SparkConf
     from pyspark import SparkContext
-    from pyspark.sql import SparkSession
-    from pyspark.sql.types import StructType
-    from pyspark.sql.types import StructField
-    from pyspark.sql.types import IntegerType
-    from pyspark.sql.types import LongType
-    from pyspark.sql.types import StringType
-    from pyspark.sql.types import ArrayType
-
+    from pyspark.streaming import StreamingContext
+    from pyspark.streaming.kafka import KafkaUtils
 
 except ImportError as e:
     print ("Error importing Spark Modules", e)
@@ -155,53 +156,46 @@ def mapToList(edges_indexes):
     return tupl_to_list
 
 
+def join_connected_edges(combination, original_edges):
+    edges_indexes_list = list(combination) if type(combination) is list else [combination]
+    result_list = []
+    # for edge in initial_edges:
+
+
+    return result_list
 
 
 conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
 sc = SparkContext(conf=conf)
-ss = SparkSession \
-    .builder \
-    .appName("SubgraphMiningDF") \
-    .getOrCreate()
 
 # load the edges and deduplicate them
 edges = map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv')
 sample = '7d734d06-f2b1-4924-a201-620ac8084c49'
-list_of_list = []
-for edge in edges:
-    list_of_list.append([edge])
-rdd_1 = sc.parallelize(list_of_list)
-print rdd_1.collect()
-schema = StructType([StructField('c' + str(i), ArrayType(IntegerType()), True) for i in range(1)])
-rdd_1_df = ss.createDataFrame(rdd_1, schema)
-rdd_1_df.printSchema()
-print rdd_1_df.schema.names
-rdd_1_df.show()
-# rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges))
-# # rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
-# counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
-# print counts_by_label_1.collect()
-# # counts_by_label_1.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(1))
-dfs = list()
-dfs.append(rdd_1_df)
 
-for i in range(2, 3):
+rdd_1 = sc.parallelize(range(len(edges)))
+rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges))
+#     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
+counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+counts_by_label_list_1 = counts_by_label_1.collect()
+counts_by_label_1.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(1))
+edges_list = sc.broadcast(edges)
+rdd_last = rdd_1
+
+for i in range(2, 6):
     print 'SIZE ' + str(i)
     # for each element in rdd_1 create a list and add to new rdd
-    df_last = dfs[len(dfs) - 1]
-    df_next = df_last.join(rdd_1_df, rdd_1_df.c0.contains(df_last.c0))  # and (() or ()))
-    df_next.show()
-#     rdd_next = df_next.rdd
-#     print rdd_next.first()
-#     # rdd_next = rdd_next.flatMap(lambda x: [element for tupl in x for element in tupl])
-#     # filter the connected graphs
-#     rdd_next = rdd_next.map(lambda x: mapToList(x))
-#     rdd_next = rdd_next.filter(lambda comb: filter_by_connected(comb, edges))
-#
-#     print rdd_next.first()
-#     dfs.append(rdd_next)
-#     # create a graph from each list
-#     rdd_of_graphs = rdd_next.map(lambda combination: map_to_graph(combination, edges))
-# #     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
-#     counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
-#     counts_by_label.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(i))
+    # rdd_next = rdd_last.cartesian(rdd_1)
+    rdd_next = rdd_last.map(lambda combination: join_connected_edges(combination, edges_list))
+    print rdd_next.first()
+    # rdd_next = rdd_next.flatMap(lambda x: [element for tupl in x for element in tupl])
+    # filter the connected graphs
+    # rdd_next = rdd_next.map(lambda x: mapToList(x))
+    # rdd_next = rdd_next.filter(lambda comb: filter_by_connected(comb, edges))
+
+    print rdd_next.first()
+    rdd_last = rdd_next
+    # create a graph from each list
+    rdd_of_graphs = rdd_next.flatMap(lambda combination: map_to_graph(combination, edges_list))
+#     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
+    counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+    counts_by_label.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(i))

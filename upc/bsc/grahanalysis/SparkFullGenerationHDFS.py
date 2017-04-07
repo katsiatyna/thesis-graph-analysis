@@ -3,17 +3,11 @@
 import os
 import sys
 import csv
-import itertools
 import numpy as np
 from pynauty import *
 import re
 import networkx as nx
-import matplotlib.pyplot as plt
-import pylab
-import pydot
-import pygraphviz
-from networkx.drawing.nx_agraph import graphviz_layout
-from networkx.drawing.nx_agraph import write_dot
+from hdfs import Config
 
 
 # Set the path for spark installation
@@ -155,6 +149,8 @@ def mapToList(edges_indexes):
     # print 'LIST: ' + str(tupl_to_list)
     return tupl_to_list
 
+client = Config().get_client('dev')
+client.delete('subgraphs', recursive=True)
 
 conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
 sc = SparkContext(conf=conf)

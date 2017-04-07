@@ -3,7 +3,7 @@ import ast
 
 client = Config().get_client('dev')
 for i in range(1, 4):
-    dir_path = '7d734d06-f2b1-4924-a201-620ac8084c49/' + str(i)
+    dir_path = 'subgraphs/7d734d06-f2b1-4924-a201-620ac8084c49/' + str(i)
     fnames = client.list(dir_path)
     results = []
     for fname in fnames:
@@ -17,4 +17,5 @@ for i in range(1, 4):
                 subgraphs_str = tuple_freq_list[1][0:len(tuple_freq_list[1]) - 3].strip()
                 subgraphs_list = ast.literal_eval(subgraphs_str)
                 results.append((label_str, (freq, subgraphs_list)))
+                print results
 

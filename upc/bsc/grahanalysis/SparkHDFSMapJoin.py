@@ -7,6 +7,7 @@ import numpy as np
 from pynauty import *
 import re
 import networkx as nx
+from hdfs import Config
 
 
 # Set the path for spark installation
@@ -164,7 +165,8 @@ def join_connected_edges(combination, original_edges):
 def map_line_to_edge(line):
     pass
 
-
+client = Config().get_client('dev')
+client.delete('subgraphs', recursive=True)
 conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
 sc = SparkContext(conf=conf)
 

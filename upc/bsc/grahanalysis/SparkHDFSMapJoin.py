@@ -100,7 +100,7 @@ def map_to_graph(combination, edges):
     if type(combination) is int:
         combination = [combination]
     for ind in combination:
-        original_edges.append(edges[ind])
+        original_edges.append(edges.value[ind])
     original_vertices = set()
     for edge in original_edges:
         original_vertices.add(edge[0])
@@ -159,9 +159,19 @@ def mapToList(edges_indexes):
 def join_connected_edges(combination, original_edges):
     edges_indexes_list = list(combination) if type(combination) is list else [combination]
     result_list = []
-    # for edge in initial_edges:
-
-
+    combination_edges = []
+    vertices_set = set()
+    for edge_index in edges_indexes_list:
+        edge_current = original_edges.value[edge_index]
+        combination_edges.append(edge_current)
+        vertices_set.add(edge_current[0])
+        vertices_set.add(edge_current[1])
+    for edge in original_edges.value:
+        if edge not in combination_edges and (edge[0] in vertices_set or edge[1] in vertices_set):
+            new_list = edges_indexes_list + [original_edges.value.index(edge)]
+            # print new_list
+            result_list.append(new_list)
+    # print 'LISTS: ' + str(result_list)
     return result_list
 
 
@@ -170,24 +180,23 @@ sc = SparkContext(conf=conf)
 
 # load the edges and deduplicate them
 edges = map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv')
+edges_list = sc.broadcast(edges)
 sample = '7d734d06-f2b1-4924-a201-620ac8084c49'
 
 rdd_1 = sc.parallelize(range(len(edges)))
-rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges))
+print rdd_1.collect()
+rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges_list))
 #     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
 counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
 counts_by_label_list_1 = counts_by_label_1.collect()
 counts_by_label_1.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(1))
-edges_list = sc.broadcast(edges)
 rdd_last = rdd_1
 
 for i in range(2, 6):
     print 'SIZE ' + str(i)
     # for each element in rdd_1 create a list and add to new rdd
     # rdd_next = rdd_last.cartesian(rdd_1)
-    rdd_next = rdd_last.map(lambda combination: join_connected_edges(combination, edges_list))
-    print rdd_next.first()
-    # rdd_next = rdd_next.flatMap(lambda x: [element for tupl in x for element in tupl])
+    rdd_next = rdd_last.flatMap(lambda combination: join_connected_edges(combination, edges_list))
     # filter the connected graphs
     # rdd_next = rdd_next.map(lambda x: mapToList(x))
     # rdd_next = rdd_next.filter(lambda comb: filter_by_connected(comb, edges))
@@ -195,7 +204,8 @@ for i in range(2, 6):
     print rdd_next.first()
     rdd_last = rdd_next
     # create a graph from each list
-    rdd_of_graphs = rdd_next.flatMap(lambda combination: map_to_graph(combination, edges_list))
-#     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
+    rdd_of_graphs = rdd_next.map(lambda combination: map_to_graph(combination, edges_list))
+    print rdd_of_graphs.first()
     counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+    #print counts_by_label.first()
     counts_by_label.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(i))

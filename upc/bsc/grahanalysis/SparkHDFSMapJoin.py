@@ -165,7 +165,9 @@ def join_connected_edges(combination, original_edges):
 def map_line_to_edge(line):
     pass
 
+hdfs_root = 'hdfs://localhost:54310/'
 client = Config().get_client('dev')
+print 'Deleting HDFS directory...'
 client.delete('subgraphs', recursive=True)
 conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
 sc = SparkContext(conf=conf)
@@ -177,7 +179,7 @@ sample = '7d734d06-f2b1-4924-a201-620ac8084c49'
 
 
 # try to read from hdfs
-lines = sc.textFile('hdfs://localhost:54310/samples/new_assignment_separate.csv')
+lines = sc.textFile(hdfs_root + 'samples/new_assignment_separate.csv')
 header = lines.first()  # extract header
 lines = lines.filter(lambda row: row != header)   # filter out header
 positions_rdd = lines.map(lambda line: line.split(','))
@@ -205,7 +207,7 @@ rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges_
 #     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
 counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
 counts_by_label_list_1 = counts_by_label_1.collect()
-counts_by_label_1.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(1))
+counts_by_label_1.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(1))
 rdd_last = rdd_1
 
 for i in range(2, 6):
@@ -224,4 +226,4 @@ for i in range(2, 6):
     print rdd_of_graphs.first()
     counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
     #print counts_by_label.first()
-    counts_by_label.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + '/' + str(i))
+    counts_by_label.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(i))

@@ -160,8 +160,30 @@ conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
 sc = SparkContext(conf=conf)
 
 # load the edges and deduplicate them
-edges = map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv')
+# edges = map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv')
 sample = '7d734d06-f2b1-4924-a201-620ac8084c49'
+
+# try to read from hdfs
+lines = sc.textFile('hdfs://localhost:54310/samples/new_assignment_separate.csv')
+header = lines.first()  # extract header
+lines = lines.filter(lambda row: row != header)   # filter out header
+positions_rdd = lines.map(lambda line: line.split(','))
+print positions_rdd.collect()
+positions_combined = lines.flatMap(lambda line: line.split(','))
+positions_distinct = positions_combined.distinct()
+positions_distinct_list = positions_distinct.collect()
+edges_rdd = positions_rdd.map(lambda positions: [positions_distinct_list.index(positions[0])
+                                                 if positions_distinct_list.index(positions[0]) < positions_distinct_list.index(positions[1])
+                                                 else positions_distinct_list.index(positions[1]),
+                                                 positions_distinct_list.index(positions[1])
+                                                 if positions_distinct_list.index(positions[0]) < positions_distinct_list.index(positions[1])
+                                                 else positions_distinct_list.index(positions[0])])
+edges_rdd = edges_rdd.map(lambda edge: (str(edge[0]) + ':' + str(edge[1]), (edge, 1)))
+print edges_rdd.collect()
+edges_rdd = edges_rdd.reduceByKey(lambda edge_kv1, edge_kv2: (edge_kv1[0], edge_kv1[1] + edge_kv2[1]) )
+edges_rdd_list = edges_rdd.collect()
+edges = [tuple(item[1][0]) for item in edges_rdd_list]
+print len(edges)
 
 rdd_1 = sc.parallelize(range(len(edges)))
 rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges))
@@ -172,6 +194,7 @@ counts_by_label_1.saveAsTextFile('hdfs://localhost:54310/subgraphs/' + sample + 
 rdds = list()
 sc.broadcast(rdd_1.collect())
 rdds.append(rdd_1)
+print rdd_1.count()
 
 for i in range(2, 6):
     print 'SIZE ' + str(i)

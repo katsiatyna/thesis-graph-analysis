@@ -88,12 +88,13 @@ def construct_new_assignment(original_pos, peak_indexes, edges):
                                original_pos[find_closest_peak(original_pos.index(float(edge[1])), peak_indexes)]))
     return new_assignment
 
+
 def construct_new_assignment_fft(original_pos, support_pos, peak_indexes):
-    new_assignment = dict()
+    new_assignment_fft = dict()
     for pos in original_pos:
         new_pos = find_closest_peak_fft(pos, support_pos, peak_indexes)
-        new_assignment[pos] = new_pos
-    return new_assignment
+        new_assignment_fft[pos] = new_pos
+    return new_assignment_fft
 
 
 def func(x, return_val):

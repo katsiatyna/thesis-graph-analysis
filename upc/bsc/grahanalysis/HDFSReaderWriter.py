@@ -1,7 +1,13 @@
 from hdfs import Config
 import ast
+import csv
 
 client = Config().get_client('dev')
+# write the assignment file
+with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment.csv', 'rw') as csvfile:
+    client.delete('sample', recursive=True)
+    client.delete('samples/new_assignment_separate2.csv', recursive=True)
+    client.write('samples/new_assignment_separate.csv', csvfile)
 for i in range(1, 4):
     dir_path = 'subgraphs/7d734d06-f2b1-4924-a201-620ac8084c49/' + str(i)
     fnames = client.list(dir_path)

@@ -213,7 +213,6 @@ rdd_last = rdd_1
 for i in range(2, 6):
     print 'SIZE ' + str(i)
     # for each element in rdd_1 create a list and add to new rdd
-    # rdd_next = rdd_last.cartesian(rdd_1)
     rdd_next = rdd_last.flatMap(lambda combination: join_connected_edges(combination, edges_list))
     # filter the connected graphs
     # rdd_next = rdd_next.map(lambda x: mapToList(x))

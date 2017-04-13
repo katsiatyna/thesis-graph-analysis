@@ -32,52 +32,23 @@ except ImportError as e:
     sys.exit(1)
 
 
-def combinations_local(iterable, r):
-    # combinations('ABCD', 2) --> AB AC AD BC BD CD
-    # combinations(range(4), 3) --> 012 013 023 123
-    pool = tuple(iterable)
-    n = len(pool)
-    if r > n:
-        return
-    indices = range(r)
-    yield tuple(pool[i] for i in indices)
-    while True:
-        for i in reversed(range(r)):
-            if indices[i] != i + n - r:
-                break
-        else:
-            return
-        indices[i] += 1
-        for j in range(i+1, r):
-            indices[j] = indices[j-1] + 1
-        yield tuple(pool[i] for i in indices)
+def get_subgraph_hash(edges_indexes):
+    # ORDER INSIDE EDGES IS ALREADY DONE
+    # NOW ONLY NEED TO ORDER EDGES BETWEEN THEMSELVES
+    hash_str = ''
+    # rearrange the edges
+    edges_indexes = sorted(edges_indexes)  # sorts on the first elements first and then on second
+    for edge in edges_indexes:
+        hash_str += str(edge) + ';'
+    return hash_str
 
 
-def map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment.csv'):
-    with open(path, 'rb') as csvfile:
-        reader = csv.DictReader(csvfile, fieldnames=['pos_1', 'pos_2'])
-        next(csvfile)
-        positions = list()
-        edges_set = set()
-        edges = list()
-        for row in reader:
-            positions.append((row['pos_1'], row['pos_2']))
-
-        vertices_set = set()
-        for position in positions:
-            vertices_set.add(position[0])
-            vertices_set.add(position[1])
-        vertices_list = list(vertices_set)
-
-        # ORIGINAL EDGES ARE ALL SORTED MIN -> MAX
-        for edge in positions:
-            # always minIndex -> maxIndex to avoid duplicate edges
-            if vertices_list.index(edge[0]) < vertices_list.index(edge[1]):
-                edges_set.add((vertices_list.index(edge[0]), vertices_list.index(edge[1])))
-            else:
-                edges_set.add((vertices_list.index(edge[1]), vertices_list.index(edge[0])))
-        edges = list(edges_set)
-        return edges
+def map_to_tuple_with_hash(combination):
+    # edges are list of indexes
+    # this is going to be the key
+    if type(combination) is int:
+        combination = [combination]
+    return (get_subgraph_hash(combination), combination)
 
 
 def map_to_graph(combination, edges):
@@ -162,8 +133,6 @@ def join_connected_edges(combination, original_edges):
     # print 'LISTS: ' + str(result_list)
     return result_list
 
-def map_line_to_edge(line):
-    pass
 
 hdfs_root = 'hdfs://localhost:54310/'
 client = Config().get_client('dev')
@@ -194,7 +163,6 @@ edges_rdd = positions_rdd.map(lambda positions: [positions_distinct_list.index(p
                                                  if positions_distinct_list.index(positions[0]) < positions_distinct_list.index(positions[1])
                                                  else positions_distinct_list.index(positions[0])])
 edges_rdd = edges_rdd.map(lambda edge: (str(edge[0]) + ':' + str(edge[1]), (edge, 1)))
-print edges_rdd.collect()
 edges_rdd = edges_rdd.reduceByKey(lambda edge_kv1, edge_kv2: (edge_kv1[0], edge_kv1[1] + edge_kv2[1]) )
 edges_rdd_list = edges_rdd.collect()
 edges = [tuple(item[1][0]) for item in edges_rdd_list]
@@ -202,7 +170,6 @@ print len(edges)
 edges_list = sc.broadcast(edges)
 
 rdd_1 = sc.parallelize(range(len(edges)))
-print rdd_1.collect()
 rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges_list))
 #     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
 counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
@@ -210,14 +177,17 @@ counts_by_label_list_1 = counts_by_label_1.collect()
 counts_by_label_1.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(1))
 rdd_last = rdd_1
 
-for i in range(2, 6):
+for i in range(2, 4):
     print 'SIZE ' + str(i)
     # for each element in rdd_1 create a list and add to new rdd
     rdd_next = rdd_last.flatMap(lambda combination: join_connected_edges(combination, edges_list))
-    # filter the connected graphs
-    # rdd_next = rdd_next.map(lambda x: mapToList(x))
-    # rdd_next = rdd_next.filter(lambda comb: filter_by_connected(comb, edges))
-
+    print rdd_next.first()
+    rdd_next = rdd_next.map(lambda combination: map_to_tuple_with_hash(combination))
+    print rdd_next.count()
+    print rdd_next.first()
+    rdd_next = rdd_next.reduceByKey(lambda a, b: a)
+    print rdd_next.count()
+    rdd_next = rdd_next.map(lambda x: x[1])
     print rdd_next.first()
     rdd_last = rdd_next
     # create a graph from each list

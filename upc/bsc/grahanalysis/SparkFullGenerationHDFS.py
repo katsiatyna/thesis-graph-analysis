@@ -35,26 +35,6 @@ except ImportError as e:
     sys.exit(1)
 
 
-def combinations_local(iterable, r):
-    # combinations('ABCD', 2) --> AB AC AD BC BD CD
-    # combinations(range(4), 3) --> 012 013 023 123
-    pool = tuple(iterable)
-    n = len(pool)
-    if r > n:
-        return
-    indices = range(r)
-    yield tuple(pool[i] for i in indices)
-    while True:
-        for i in reversed(range(r)):
-            if indices[i] != i + n - r:
-                break
-        else:
-            return
-        indices[i] += 1
-        for j in range(i+1, r):
-            indices[j] = indices[j-1] + 1
-        yield tuple(pool[i] for i in indices)
-
 
 def map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment.csv'):
     with open(path, 'rb') as csvfile:
@@ -84,6 +64,26 @@ def map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/v
                 edges_set.add((vertices_list.index(edge[1]), vertices_list.index(edge[0])))
         edges = list(edges_set)
         return edges
+
+
+def get_subgraph_hash(edges_indexes):
+    # ORDER INSIDE EDGES IS ALREADY DONE
+    # NOW ONLY NEED TO ORDER EDGES BETWEEN THEMSELVES
+    hash_str = ''
+    # rearrange the edges
+    edges_indexes = sorted(edges_indexes)  # sorts on the first elements first and then on second
+    for edge in edges_indexes:
+        hash_str += str(edge) + ';'
+    return hash_str
+
+
+def map_to_tuple_with_hash(combination):
+    # edges are list of indexes
+    # this is going to be the key
+    if type(combination) is int:
+        combination = [combination]
+    return (get_subgraph_hash(combination), combination)
+
 
 
 def map_to_graph(combination, edges):
@@ -194,15 +194,21 @@ sc.broadcast(rdd_1.collect())
 rdds.append(rdd_1)
 print rdd_1.count()
 
-for i in range(2, 6):
+for i in range(2, 4):
     print 'SIZE ' + str(i)
     # for each element in rdd_1 create a list and add to new rdd
     rdd_last = rdds[len(rdds) - 1]
     rdd_next = rdd_last.cartesian(rdd_1)
-    print rdd_next.first()
-    # rdd_next = rdd_next.flatMap(lambda x: [element for tupl in x for element in tupl])
-    # filter the connected graphs
     rdd_next = rdd_next.map(lambda x: mapToList(x))
+    print rdd_next.first()
+    rdd_next = rdd_next.map(lambda combination: map_to_tuple_with_hash(combination))
+    print rdd_next.count()
+    print rdd_next.first()
+    rdd_next = rdd_next.reduceByKey(lambda a, b: a)
+    print rdd_next.count()
+    rdd_next = rdd_next.map(lambda x: x[1])
+    print rdd_next.first()
+    rdd_last = rdd_next
     rdd_next = rdd_next.filter(lambda comb: filter_by_connected(comb, edges))
 
     print rdd_next.first()

@@ -143,6 +143,11 @@ def write_lg_input_file(assignment, path='/home/kkrasnas/Documents/thesis/patter
 
     f.close()
 
+
+def test_new_assignment(new_edges):
+    pass
+
+
 # info chromosome
 CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
            171115067, 159138663, 146364022, 141213431, 135534747,
@@ -208,7 +213,7 @@ if(mode_separate):
 else:
     ax[0].plot(X_collection, np.exp(log_dens_collection),  '-h', markevery=indexes_scipy_collection)
     ax[0].plot(X_collection, x_plot_y, '+k')
-    # ax[0].plot(X_collection, x_plot_y, '+r', markevery=margins)
+    ax[0].plot(X_collection, x_plot_y, '+r', markevery=margins)
     ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy_collection)), xy=get_axis_limits(ax[0]))
 
 
@@ -343,3 +348,6 @@ for edge in edges:
 # # write_lg_input_file(new_assignment)
 
 pyplot.show()
+
+
+test_new_assignment(new_edges)

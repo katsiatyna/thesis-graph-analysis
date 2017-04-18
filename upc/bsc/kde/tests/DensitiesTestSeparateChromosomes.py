@@ -144,8 +144,109 @@ def write_lg_input_file(assignment, path='/home/kkrasnas/Documents/thesis/patter
     f.close()
 
 
-def test_new_assignment(new_edges):
-    pass
+def test_new_assignment(assignment, positions_by_chrom):
+    # reassign from values to keys
+    min_dist_collection = list()
+    max_dist_collection = list()
+    for chrom in positions_by_chrom.keys():
+        min_dist_non_joined = sys.maxint
+        max_dist_joined = -sys.maxint - 1
+        for pos1 in positions_by_chrom[chrom]:
+            for pos2 in positions_by_chrom[chrom]:
+                if pos1 == pos2:
+                    continue
+                # if two positions assigned to the same destination - find out if the distance is bigger than the max
+                if assignment[pos1] == assignment[pos2] and abs(pos1 - pos2) > max_dist_joined:
+                    max_dist_joined = abs(pos1 - pos2)
+                else:
+                    # if two positions assigned to different destinations - find out if the distance is smaller than the min
+                    if assignment[pos1] != assignment[pos2] and abs(pos1 - pos2) < min_dist_non_joined:
+                        min_dist_non_joined = abs(pos1 - pos2)
+
+        if min_dist_non_joined < sys.maxint:
+            min_dist_collection.append(min_dist_non_joined)
+        if max_dist_joined > -sys.maxint - 1:
+            max_dist_collection.append(max_dist_joined)
+    avg_max_joined = float(sum(max_dist_collection)) / len(max_dist_collection)
+    max_max_joined = max(max_dist_collection)
+    avg_min_non_joined = float(sum(min_dist_collection)) / len(min_dist_collection)
+    min_min_non_joined = min(min_dist_collection)
+    print 'Average Max distance between joined: ' + str(avg_max_joined)
+    print 'Max Max distance between joined: ' + str(max_max_joined) + ', chrom: ' + str(max_dist_collection.index(max_max_joined))
+    print 'Average Min distance between non-joined: ' + str(avg_min_non_joined)
+    print 'Min Min distance between non-joined: ' + str(min_min_non_joined) + ', chrom: ' + str(min_dist_collection.index(min_min_non_joined))
+
+
+def external_edge(pos, orig_edges):
+    # find an edge with this position
+    for edge in orig_edges:
+        if float(edge[0][1]) == pos and edge[0][0] != edge[1][0]:
+            return True
+        if float(edge[1][1]) == pos and edge[1][0] != edge[0][0]:
+            return True
+    return False
+
+
+def internal_edge(pos1, pos2, orig_edges):
+    for edge in orig_edges:
+        if float(edge[0][1]) == pos1 and float(edge[1][1]) == pos2:
+            return True
+        if float(edge[1][1]) == pos1 and float(edge[0][1]) == pos2:
+            return True
+    return False
+
+
+def test_new_assignment_with_correction(assignment, positions_by_chrom, orig_edges):
+    # reassign from values to keys
+    min_dist_collection = list()
+    max_dist_collection = list()
+    for chrom in positions_by_chrom.keys():
+        min_dist_non_joined = sys.maxint
+        max_dist_joined = -sys.maxint - 1
+        for pos1 in positions_by_chrom[chrom]:
+            for pos2 in positions_by_chrom[chrom]:
+                if pos1 == pos2:
+                    continue
+                # if two positions assigned to the same destination - find out if the distance is bigger than the max
+                if assignment[pos1] == assignment[pos2] \
+                        and external_edge(pos1, orig_edges) \
+                        and external_edge(pos2, orig_edges)\
+                        and abs(pos1 - pos2) > max_dist_joined:
+                    max_dist_joined = abs(pos1 - pos2)
+                else:
+                    # if two positions assigned to different destinations - find out if the distance is smaller than the min
+                    if assignment[pos1] != assignment[pos2] and internal_edge(pos1, pos2, orig_edges)\
+                            and abs(pos1 - pos2) < min_dist_non_joined:
+                        min_dist_non_joined = abs(pos1 - pos2)
+
+        if min_dist_non_joined < sys.maxint:
+            min_dist_collection.append(min_dist_non_joined)
+        if max_dist_joined > -sys.maxint - 1:
+            max_dist_collection.append(max_dist_joined)
+    avg_max_joined = float(sum(max_dist_collection)) / len(max_dist_collection)
+    max_max_joined = max(max_dist_collection)
+    avg_min_non_joined = float(sum(min_dist_collection)) / len(min_dist_collection)
+    min_min_non_joined = min(min_dist_collection)
+    print 'Corrected Average Max distance between joined: ' + str(avg_max_joined)
+    print 'Corrected Max Max distance between joined: ' + str(max_max_joined) + ', chrom: ' + str(max_dist_collection.index(max_max_joined))
+    print 'Corrected Average Min distance between non-joined: ' + str(avg_min_non_joined)
+    print 'Corrected Min Min distance between non-joined: ' + str(min_min_non_joined) + ', chrom: ' + str(min_dist_collection.index(min_min_non_joined))
+
+
+def find_peaks_indexes(density_y):
+    peak_indexes = list()
+    for i in range(len(density_y)):
+        if i == 0 and density_y[i] > density_y[i+1]:
+            peak_indexes.append(i)
+            continue
+        if i == len(density_y) - 1 and density_y[i] > density_y[i-1]:
+            peak_indexes.append(i)
+            continue
+        if density_y[i-1] < density_y[i] > density_y[i+1]:
+            peak_indexes.append(i)
+            continue
+    return peak_indexes
+
 
 
 # info chromosome
@@ -154,9 +255,9 @@ CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
            135006516, 133851895, 115169878, 107349540, 102531392,
            90354753, 81195210, 78077248, 59128983, 63025520,
            48129895, 51304566, 155270560, 59373566]
-mode_separate = False
-chrom = 11
-bandwidth = 50000.0
+mode_separate = True
+chrom = 10
+bandwidth = 25000.0
 # read the positions from the largest sample
 edges = load_edges_2d()
 ds_collection = convert_to_2d_array(edges)
@@ -317,7 +418,8 @@ for i in range(0, 24):
         X_collection_sup_sep.append(dens_stats_fft.support)
         dens_collection.extend(dens_stats_fft.density)
         dens_collection_sep.append(dens_stats_fft.density)
-        indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.0, min_dist=0)
+        # indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.0, min_dist=0)
+        indexes_stats_fft = find_peaks_indexes(dens_stats_fft.density)
         indexes_collection_sep.append(indexes_stats_fft)
         print 'Chromosome ' + str(i) + ': ' + str(len(indexes_stats_fft))+ ' out of ' + str(len(ds)) + ' positions'
         for index in indexes_stats_fft:
@@ -347,7 +449,7 @@ for edge in edges:
 # # write_xgraph_input_file(new_assignment)
 # # write_lg_input_file(new_assignment)
 
+
+test_new_assignment(new_assignment, ds_collection)
+test_new_assignment_with_correction(new_assignment, ds_collection, edges)
 pyplot.show()
-
-
-test_new_assignment(new_edges)

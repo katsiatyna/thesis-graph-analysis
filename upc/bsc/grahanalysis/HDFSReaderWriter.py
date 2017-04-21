@@ -4,10 +4,17 @@ import csv
 
 client = Config().get_client('dev')
 # write the assignment file
-# with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv', 'rw') as csvfile:
-#     client.delete('sample', recursive=True)
-#     client.delete('samples/new_assignment_separate.csv', recursive=True)
-#     client.write('samples/new_assignment_separate.csv', csvfile)
+with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv', 'rw') as csvfile:
+    client.delete('sample', recursive=True)
+    client.delete('samples/new_assignment_separate.csv', recursive=True)
+    client.write('samples/new_assignment_separate.csv', csvfile)
+samples = ['7d734d06-f2b1-4924-a201-620ac8084c49','0448206f-3ade-4087-b1a9-4fb2d14e1367', 'ea1cac20-88c1-4257-9cdb-d2890eb2e123']
+for sample in samples:
+    file_name = sample + '_new_assignment.csv'
+    with open('/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/' + file_name,
+              'rw') as csvfile:
+        client.delete('samples/' + sample + '/' + file_name, recursive=True)
+        client.write('samples/' + sample + '/' + file_name, csvfile)
 results_all = dict()
 for i in range(1, 4):
     dir_path = 'subgraphs/7d734d06-f2b1-4924-a201-620ac8084c49/' + str(i)

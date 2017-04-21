@@ -133,22 +133,21 @@ def join_connected_edges(combination, original_edges):
     # print 'LISTS: ' + str(result_list)
     return result_list
 
-
+sample = 'ea1cac20-88c1-4257-9cdb-d2890eb2e123'
 hdfs_root = 'hdfs://localhost:54310/'
 client = Config().get_client('dev')
 print 'Deleting HDFS directory...'
-client.delete('subgraphs', recursive=True)
+client.delete('subgraphs/' + sample, recursive=True)
 conf = SparkConf().setAppName('SubgraphMining').setMaster('local[*]')
 sc = SparkContext(conf=conf)
 
 # load the edges and deduplicate them
 # edges = map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv')
 
-sample = '7d734d06-f2b1-4924-a201-620ac8084c49'
 
 
 # try to read from hdfs
-lines = sc.textFile(hdfs_root + 'samples/new_assignment_separate.csv')
+lines = sc.textFile(hdfs_root + 'samples/' + sample + '/' + sample + '_new_assignment.csv')
 header = lines.first()  # extract header
 lines = lines.filter(lambda row: row != header)   # filter out header
 positions_rdd = lines.map(lambda line: line.split(','))

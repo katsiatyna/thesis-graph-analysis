@@ -260,10 +260,11 @@ CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
            90354753, 81195210, 78077248, 59128983, 63025520,
            48129895, 51304566, 155270560, 59373566]
 mode_separate = True
-chrom = 7
+chrom = 20
 bandwidth = 50000.0
 # read the positions from the largest sample
-edges = load_edges_2d()
+sample = 'ea1cac20-88c1-4257-9cdb-d2890eb2e123'
+edges = load_edges_2d(path= '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/' + sample + '_positions.csv')
 ds_collection = convert_to_2d_array(edges)
 
 
@@ -451,11 +452,12 @@ new_edges = []
 for edge in edges:
     new_edges.append((new_assignment[float(edge[0][1])], new_assignment[float(edge[1][1])]))
 # print new_edges
-# write_undirect_input_file(new_edges)
+write_undirect_input_file(new_edges, path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/'
+                                          + sample + '_new_assignment.csv')
 # # write_xgraph_input_file(new_assignment)
 # # write_lg_input_file(new_assignment)
 
 
 test_new_assignment(new_assignment, ds_collection)
-# test_new_assignment_with_correction(new_assignment, ds_collection, edges)
+test_new_assignment_with_correction(new_assignment, ds_collection, edges)
 pyplot.show()

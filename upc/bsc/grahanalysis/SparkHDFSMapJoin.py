@@ -51,7 +51,15 @@ def map_to_tuple_with_hash(combination):
     return (get_subgraph_hash(combination), combination)
 
 
-def map_to_graph(combination, edges):
+def transform_to_original_edges(edges_indexes, positions_list):
+    result_edges = list()
+    for index in edges_indexes:
+        result_edge = (positions_list[index[0]], positions_list[index[1]])
+        result_edges.append(result_edge)
+    return result_edges
+
+
+def map_to_graph(combination, edges, positions_list):
     # edges are list of tuples
 
     # this is going to be the key
@@ -72,7 +80,7 @@ def map_to_graph(combination, edges):
         new_edges.append((original_vertices.index(edge[0]), original_vertices.index(edge[1])))
     # v_g = VsigramGraph(g, None, label_arr=canon_label(g), orig_edges=original_edges)
     # subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
-    return (canon_label(g), (1, [original_edges]))
+    return (canon_label(g), (1, [transform_to_original_edges(original_edges, positions_list)]))
 
 
 def update_subgraph_freq(a, b):
@@ -169,7 +177,7 @@ print len(edges)
 edges_list = sc.broadcast(edges)
 
 rdd_1 = sc.parallelize(range(len(edges)))
-rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges_list))
+rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges_list, positions_distinct_list))
 #     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
 counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
 counts_by_label_list_1 = counts_by_label_1.collect()
@@ -190,7 +198,7 @@ for i in range(2, 4):
     print rdd_next.first()
     rdd_last = rdd_next
     # create a graph from each list
-    rdd_of_graphs = rdd_next.map(lambda combination: map_to_graph(combination, edges_list))
+    rdd_of_graphs = rdd_next.map(lambda combination: map_to_graph(combination, edges_list, positions_distinct_list))
     print rdd_of_graphs.first()
     counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
     #print counts_by_label.first()

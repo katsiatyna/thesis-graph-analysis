@@ -12,25 +12,48 @@ import scipy
 from pypeaks import Data, Intervals
 
 
-
 def chr_number(chr_str):
     if chr_str == 'X':
-        index = 22
+        chr_index = 22
     else:
         if chr_str == 'Y':
-            index = 23
+            chr_index = 23
         else:
-            index = int(chr_str) - 1
-    return index
+            chr_index = int(chr_str) - 1
+    return chr_index
+
+
+def chr_str(chr_index):
+    chrom_str = 'chr'
+    if chr_index == 22:
+        chrom_str += 'X'
+    else:
+        if chr_index == 23:
+            chrom_str += 'Y'
+        else:
+            chrom_str += str(chr_index + 1)
+    return chrom_str
 
 
 def find_absolute_position(position, chromosome):
     index = chr_number(chromosome)
     offset = 0L
     if index != 0:
-        for i in range(index + 1):
+        for i in range(index):
             offset += long(CHR_MAP[i])
     return offset + long(position)
+
+
+def find_relative_position(position):
+    # index = chr_number(chromosome)
+    offset = 0L
+    for i in range(len(CHR_MAP) + 1):
+        if offset < position < offset + long(CHR_MAP[i]):
+            chrom_str = chr_str(i)
+            pos = position - offset
+            return chrom_str, pos
+        else:
+            offset += long(CHR_MAP[i])
 
 
 def load_edges_2d(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/7d734d06-f2b1-4924-a201-620ac8084c49_positions.csv'):
@@ -74,6 +97,7 @@ def find_closest_peak(i, peak_indexes):
             min_diff = diff(i,peak)
             closest_peak = peak
     return closest_peak
+
 
 def find_closest_peak_fft(pos, support_pos, peak_indexes):
     min_diff = sys.maxint
@@ -128,6 +152,47 @@ def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/
         writer.writeheader()
         for row in assignment:
             writer.writerow({'pos_1': row[0], 'pos_2': row[1]})
+
+
+def write_circos_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_for_circos.csv'):
+    # write new assignment
+    with open(path, 'wb') as csvfile:
+        fieldnames = ['source_id','source_breakpoint','target_id','target_breakpoint','source_label','target_label']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        print 'New assignment before deduplication: ' + str(len(assignment))
+        assignment_deduplicated = []
+        edges_set = set()
+        for row in assignment:
+            if row[0] < row[1]:
+                candidate_edge = (row[0], row[1])
+            else:
+                candidate_edge = (row[1], row[0])
+            if candidate_edge not in edges_set:
+                edges_set.add(candidate_edge)
+                assignment_deduplicated.append(candidate_edge)
+        print 'New assignment after deduplication: ' + str(len(assignment_deduplicated))
+        writer.writeheader()
+        for row in assignment_deduplicated:
+            source_chr, source_rel_pos = find_relative_position(row[0])
+            target_chr, target_rel_pos = find_relative_position(row[1])
+            writer.writerow({'source_id': source_chr, 'source_breakpoint': source_rel_pos,
+                             'target_id':target_chr, 'target_breakpoint': target_rel_pos,
+                             'source_label':'', 'target_label':''})
+
+
+def write_circos_input_file_orig(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_orig_for_circos.csv'):
+    # write new assignment
+    with open(path, 'wb') as csvfile:
+        fieldnames = ['source_id','source_breakpoint','target_id','target_breakpoint','source_label','target_label']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        for row in assignment:
+            source_chr, source_rel_pos = find_relative_position(row[0][1])
+            target_chr, target_rel_pos = find_relative_position(row[1][1])
+            writer.writerow({'source_id': source_chr, 'source_breakpoint': source_rel_pos,
+                             'target_id':target_chr, 'target_breakpoint': target_rel_pos,
+                             'source_label':'', 'target_label':''})
 
 
 def write_lg_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/graph.lg'):
@@ -200,7 +265,10 @@ def internal_edge(pos1, pos2, orig_edges):
     return False
 
 
-def test_new_assignment_with_correction(assignment, positions_by_chrom, orig_edges):
+def test_new_assignment_with_correction(assignment, positions_by_chrom, orig_edges, sample,
+                                        path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/'):
+    #fir the path
+    path += sample + '/' + sample + '_metrics.csv'
     # reassign from values to keys
     min_dist_collection = list()
     max_dist_collection = list()
@@ -231,6 +299,15 @@ def test_new_assignment_with_correction(assignment, positions_by_chrom, orig_edg
     max_max_joined = max(max_dist_collection)
     avg_min_non_joined = float(sum(min_dist_collection)) / len(min_dist_collection)
     min_min_non_joined = min(min_dist_collection)
+    with open(path, 'wb') as csvfile:
+        fieldnames = ['metric','value']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow({'metric': 'Inter avg. max. dist.', 'value': avg_max_joined})
+        writer.writerow({'metric': 'Inter max. max. dist.', 'value': max_max_joined})
+        writer.writerow({'metric': 'Intra avg. min. dist.', 'value': avg_min_non_joined})
+        writer.writerow({'metric': 'Intra min. min. dist.', 'value': min_min_non_joined})
+    csvfile.close()
     print 'Inter Average Max distance between joined: ' + str(avg_max_joined)
     print 'Inter Max Max distance between joined: ' + str(max_max_joined) + ', chrom: ' + str(max_dist_collection.index(max_max_joined))
     print 'Intra Average Min distance between non-joined: ' + str(avg_min_non_joined)
@@ -260,12 +337,13 @@ CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
            90354753, 81195210, 78077248, 59128983, 63025520,
            48129895, 51304566, 155270560, 59373566]
 mode_separate = True
-chrom = 20
+chrom = 1
 bandwidth = 50000.0
 # read the positions from the largest sample
 sample = 'ea1cac20-88c1-4257-9cdb-d2890eb2e123'
 edges = load_edges_2d(path= '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/' + sample + '_positions.csv')
 ds_collection = convert_to_2d_array(edges)
+chromosome_list = list(chromosome for chromosome in ds_collection.keys())
 
 
 x_plot_y = []
@@ -281,7 +359,7 @@ for i in range(0, 24):
         x_plot_y_sep.append(x_plot_y_sep_tmp)
 fig, ax = plt.subplots(nrows=4, ncols=1, sharex=False, sharey=False, squeeze=True,
              subplot_kw=None, gridspec_kw=None, figsize=(35, 15))
-pyplot.title('Bandwidth = ' + str(int(bandwidth/1000)) + 'kbp, NmbPoints = ' + str(len(x_plot_y)))
+
 # scipy
 print 'SciPy'
 X_collection = []
@@ -315,13 +393,19 @@ if(mode_separate):
     ax[0].plot(X_collection_sep[chrom], np.exp(log_dens_collection_sep[chrom]),  '-h', markevery=indexes_scipy_collection_sep[chrom])
     ax[0].plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
     # ax[0].plot(X_collection, x_plot_y, '+r', markevery=margins)
-    ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy_collection_sep[chrom])), xy=get_axis_limits(ax[0]))
+    ax[0].set_title('Bandwidth = ' + str(int(bandwidth / 1000)) + 'kbp'
+                    + ', sample chromosome = ' + str(chromosome_list[chrom])
+                    + ', NmbPoints in chromosome = ' + str(len(x_plot_y_sep[chrom]))
+                    + ': SciPy, NmbPeaks = ' + str(len(indexes_scipy_collection_sep[chrom])))
+    ax[0].axes.get_xaxis().set_ticks([])
 else:
     ax[0].plot(X_collection, np.exp(log_dens_collection),  '-h', markevery=indexes_scipy_collection)
     ax[0].plot(X_collection, x_plot_y, '+k')
     ax[0].plot(X_collection, x_plot_y, '+r', markevery=margins)
     ax[0].annotate('SciPy. NmbPeaks = ' + str(len(indexes_scipy_collection)), xy=get_axis_limits(ax[0]))
-
+    ax[0].set_title('Bandwidth = ' + str(int(bandwidth / 1000)) + 'kbp, NmbPoints = ' + str(len(x_plot_y))
+                    + ': SciPy, NmbPeaks = ' + str(len(indexes_scipy_collection)))
+    ax[0].axes.get_xaxis().set_ticks([])
 
 # pyqt-fit
 # calculate density estimation
@@ -357,11 +441,13 @@ for i in range(0, 24):
 if mode_separate:
     ax[1].plot(X_collection_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
     ax[1].plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
-    ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])), xy=get_axis_limits(ax[1]))
+    ax[1].set_title('PyQT-Fit. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])))
+    ax[1].axes.get_xaxis().set_ticks([])
 else:
     ax[1].plot(X_collection, dens_collection, '-h', markevery=indexes_collection)
     ax[1].plot(X_collection, x_plot_y, '+k')
-    ax[1].annotate('PyQT-Fit. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[1]))
+    ax[1].set_title('PyQT-Fit. NmbPeaks = ' + str(len(indexes_collection)))
+    ax[1].axes.get_xaxis().set_ticks([])
 
 # stastmodels.api without FFT
 print 'Stats no FFT'
@@ -395,11 +481,13 @@ for i in range(0, 24):
 if mode_separate:
     ax[2].plot(X_collection_sup_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
     ax[2].plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
-    ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])), xy=get_axis_limits(ax[2]))
+    ax[2].set_title('Stats No FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])))
+    ax[2].axes.get_xaxis().set_ticks([])
 else:
     ax[2].plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
     ax[2].plot(X_collection, x_plot_y, '+k')
-    ax[2].annotate('Stats No FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[2]))
+    ax[2].set_title('Stats No FFT. NmbPeaks = ' + str(len(indexes_collection)))
+    ax[2].axes.get_xaxis().set_ticks([])
 
 # stastmodels.api with FFT
 print 'Stats FFT'
@@ -436,11 +524,11 @@ if mode_separate:
     # local_max = scipy.signal.find_peaks_cwt(dens_collection_sep[chrom], np.arange(1, 2))
     # line2d = ax[3].plot(X_collection_sup_sep[chrom], dens_collection_sep[chrom], '-h', markevery=local_max)
     ax[3].plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
-    ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])), xy=get_axis_limits(ax[3]))
+    ax[3].set_title('Stats FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])))
 else:
     ax[3].plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
     ax[3].plot(X_collection, x_plot_y, '+k')
-    ax[3].annotate('Stats FFT. NmbPeaks = ' + str(len(indexes_collection)), xy=get_axis_limits(ax[3]))
+    ax[3].set_title('Stats FFT. NmbPeaks = ' + str(len(indexes_collection)))
 
 
 # # assign each point to closest peak and rewrite the edges
@@ -454,10 +542,14 @@ for edge in edges:
 # print new_edges
 write_undirect_input_file(new_edges, path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/'
                                           + sample + '_new_assignment.csv')
+write_circos_input_file(new_edges, path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/'
+                                          + sample + '_for_circos.csv')
+write_circos_input_file_orig(edges, path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/'
+                                          + sample + '_orig_for_circos.csv')
 # # write_xgraph_input_file(new_assignment)
 # # write_lg_input_file(new_assignment)
 
 
 test_new_assignment(new_assignment, ds_collection)
-test_new_assignment_with_correction(new_assignment, ds_collection, edges)
+#test_new_assignment_with_correction(new_assignment, ds_collection, edges, sample)
 pyplot.show()

@@ -65,6 +65,7 @@ for i in range(4):
     ax[i].fill(x_grid, pdf_true, ec='gray', fc='gray', alpha=0.4)
     ax[i].set_title(kde_funcnames[i])
     ax[i].set_xlim(-4.5, 3.5)
+plt.show()
 
 from IPython.display import HTML
 HTML("<font color='#666666'>Gray = True underlying distribution</font><br>"

@@ -2,11 +2,12 @@ import networkx as nx
 import csv
 import pylab as plt
 from networkx.drawing.nx_agraph import write_dot, graphviz_layout, pygraphviz_layout
+from networkx.algorithms.approximation.independent_set import maximum_independent_set
 
 
 G=nx.Graph()
 
-with open('/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv', 'rb') as csvfile:
+with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment.csv', 'rb') as csvfile:
     reader = csv.DictReader(csvfile, fieldnames=['pos_1', 'pos_2'])
     next(csvfile)
     positions = []
@@ -38,3 +39,4 @@ with open('/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv', '
     for key in triangles.keys():
         if triangles[key] > 0:
             print str(key) + ': ' + str(triangles[key])
+    print list(maximum_independent_set(G))

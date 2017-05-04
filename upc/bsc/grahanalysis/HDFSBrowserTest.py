@@ -127,6 +127,7 @@ def build_tree(parent_label, child_index, imax, res, current_dict):
 def return_hierarchical_results():
     results = return_analysis_results()
     res_per_sample = dict()
+    freq_per_sample_pattern = dict()
     for sample in results.keys():
         results_hier = dict()
         last_level_dict = dict()
@@ -135,7 +136,11 @@ def return_hierarchical_results():
         for parent in results[sample][i]:
             last_level_dict = build_tree(parent, i + 1, imax, results[sample], last_level_dict)
         res_per_sample[sample] = last_level_dict
-    return res_per_sample
+        freq_per_sample_pattern[sample] = {}
+        for size in range(1, len(results[sample]) + 1):
+            for pattern in results[sample][size]:
+                freq_per_sample_pattern[sample][pattern] = results[sample][size][pattern]['freq']
+    return freq_per_sample_pattern, res_per_sample
 
 
 def return_analysis_results():

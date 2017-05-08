@@ -340,7 +340,7 @@ mode_separate = True
 chrom = 1
 bandwidth = 50000.0
 # read the positions from the largest sample
-sample = 'ea1cac20-88c1-4257-9cdb-d2890eb2e123'
+sample = '7d734d06-f2b1-4924-a201-620ac8084c49'
 edges = load_edges_2d(path= '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/' + sample + '_positions.csv')
 ds_collection = convert_to_2d_array(edges)
 chromosome_list = list(chromosome for chromosome in ds_collection.keys())
@@ -551,5 +551,5 @@ write_circos_input_file_orig(edges, path='/home/kkrasnas/Documents/thesis/patter
 
 
 test_new_assignment(new_assignment, ds_collection)
-#test_new_assignment_with_correction(new_assignment, ds_collection, edges, sample)
+test_new_assignment_with_correction(new_assignment, ds_collection, edges, sample)
 pyplot.show()

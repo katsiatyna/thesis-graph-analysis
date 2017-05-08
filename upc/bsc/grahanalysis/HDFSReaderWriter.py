@@ -2,7 +2,7 @@ from hdfs import Config
 import ast
 import csv
 import networkx as nx
-from networkx.algorithms.approximation import maximum_independent_set
+from networkx.algorithms.approximation import maximum_independent_set, max_clique
 from networkx.algorithms import maximal_independent_set
 import igraph as ig
 import matplotlib.pyplot as plt
@@ -87,7 +87,10 @@ for sample in samples:
     for graph in graphs:
         # nx.draw(graph)
         # plt.show()
-        print len(maximal_independent_set(graph))
+        print 'MAXIMUM ' + str(len(maximum_independent_set(graph)))
+        print 'MAXIMAL ' + str(len(maximal_independent_set(graph)))
+        graph_compl = nx.complement(graph)
+        print 'MAXIMUM CLIQUE ' + str(len(max_clique(graph_compl)))
     # print len(maximum_independent_set(nx_g))
     # print i_g.independence_number()
 

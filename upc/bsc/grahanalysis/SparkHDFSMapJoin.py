@@ -141,7 +141,7 @@ def join_connected_edges(combination, original_edges):
     # print 'LISTS: ' + str(result_list)
     return result_list
 
-sample = 'ea1cac20-88c1-4257-9cdb-d2890eb2e123'
+sample = '7d734d06-f2b1-4924-a201-620ac8084c49'
 hdfs_root = 'hdfs://localhost:54310/'
 client = Config().get_client('dev')
 print 'Deleting HDFS directory...'

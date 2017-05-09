@@ -20,7 +20,7 @@ setup(
     keywords="subgraph mining, kafka, spark",
     install_requires=["pynauty", "networkx", "peakutils",
                       "numpy", "matplotlib", "pyqt_fit",
-                      "statsmodels", "sklearn"],
+                      "statsmodels", "sklearn", 'hdfs'],
     long_description=read('README.md'),
     url="http://example.com",
     py_modules=['upc.bsc.grahanalysis.model.SubgraphCollection',

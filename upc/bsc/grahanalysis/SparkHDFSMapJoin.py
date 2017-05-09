@@ -8,6 +8,7 @@ from pynauty import *
 import re
 import networkx as nx
 from hdfs import Config
+from networkx.algorithms.approximation import maximum_independent_set, max_clique
 
 
 # Set the path for spark installation
@@ -80,7 +81,29 @@ def map_to_graph(combination, edges, positions_list):
         new_edges.append((original_vertices.index(edge[0]), original_vertices.index(edge[1])))
     # v_g = VsigramGraph(g, None, label_arr=canon_label(g), orig_edges=original_edges)
     # subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
-    return (canon_label(g), (1, [transform_to_original_edges(original_edges, positions_list)]))
+    # return (canon_label(g), (1, [transform_to_original_edges(original_edges, positions_list)]))
+    return (canon_label(g), (1, [original_edges]))
+
+
+def fix_frequency(pattern):
+    graphs = pattern[1][1]
+    nodes = range(len(graphs))
+    nx_g = nx.Graph()
+    nx_g.add_nodes_from(nodes)
+    for index0 in range(len(graphs)):
+        for index1 in range(index0 + 1, len(graphs)):
+            # if two graphs under indexes have at least one edge in common - draw an edge
+            graph0 = set(graphs[index0])
+            graph1 = set(graphs[index1])
+            intersection = graph0.intersection(graph1)
+            if 0 < len(intersection):
+                # build a edge
+                nx_g.add_edge(index0, index1)
+    graphs_connected = list(nx.connected_component_subgraphs(nx_g))
+    freq = 0
+    for graph in graphs_connected:
+        freq += len(maximum_independent_set(graph))
+    return (pattern[0], [pattern[1][0], freq, pattern[1][1]])
 
 
 def update_subgraph_freq(a, b):
@@ -116,7 +139,7 @@ def filter_by_connected(edges_indexes, orig_edges):
     return nx.is_connected(nx_g)
 
 
-def mapToList(edges_indexes):
+def map_to_list(edges_indexes):
     tupl_to_list = list(edges_indexes[0]) if type(edges_indexes[0]) is list else [edges_indexes[0]]
     tupl_to_list.append(edges_indexes[1])
     # print 'LIST: ' + str(tupl_to_list)
@@ -178,9 +201,7 @@ edges_list = sc.broadcast(edges)
 
 rdd_1 = sc.parallelize(range(len(edges)))
 rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges_list, positions_distinct_list))
-#     rdd_filtered = rdd_of_graphs.filter(lambda x: x[1] is not None)
 counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
-counts_by_label_list_1 = counts_by_label_1.collect()
 counts_by_label_1.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(1))
 rdd_last = rdd_1
 
@@ -188,18 +209,17 @@ for i in range(2, 4):
     print 'SIZE ' + str(i)
     # for each element in rdd_1 create a list and add to new rdd
     rdd_next = rdd_last.flatMap(lambda combination: join_connected_edges(combination, edges_list))
-    print rdd_next.first()
     rdd_next = rdd_next.map(lambda combination: map_to_tuple_with_hash(combination))
     print rdd_next.count()
-    print rdd_next.first()
     rdd_next = rdd_next.reduceByKey(lambda a, b: a)
     print rdd_next.count()
     rdd_next = rdd_next.map(lambda x: x[1])
-    print rdd_next.first()
     rdd_last = rdd_next
     # create a graph from each list
     rdd_of_graphs = rdd_next.map(lambda combination: map_to_graph(combination, edges_list, positions_distinct_list))
     print rdd_of_graphs.first()
     counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
     #print counts_by_label.first()
-    counts_by_label.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(i))
+    # fix the frequency
+    fixed_freq = counts_by_label.map(lambda pattern: fix_frequency(pattern))
+    fixed_freq.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(i))

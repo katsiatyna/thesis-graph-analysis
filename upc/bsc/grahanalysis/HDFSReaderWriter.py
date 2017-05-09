@@ -1,3 +1,4 @@
+import datetime
 from hdfs import Config
 import ast
 import csv
@@ -61,38 +62,40 @@ for sample in samples:
         continue
     results = get_results(client, sample)
     # build an overlap graph with triangles
-    test_graphs = results[3]['0:  1 2;  1:  0 2;  2:  0 1;']['graphs']
+    test_graphs = results[3]['0:  2;  1:  3;  2:  0 3;  3:  1 2;']['graphs']
     nodes = range(len(test_graphs))
     nx_g = nx.Graph()
-    i_g = ig.Graph()
     nx_g.add_nodes_from(nodes)
-    i_g.add_vertices(len(test_graphs))
-    edges_set = set()
-    for index0 in nodes:
-        for index1 in nodes:
-            if index0 < index1:
-                # if two graphs under indexes have at least one edge in common - draw an edge
-                graph0 = set(test_graphs[index0])
-                graph1 = set(test_graphs[index1])
-                intersection = graph0.intersection(graph1)
-                if 0 < len(intersection):
-                    # build a edge
-                    if (index0, index1) not in edges_set:
-                        edges_set.add((index0, index1))
-                        # print intersection
-                        nx_g.add_edge(index0, index1)
-                        i_g.add_edge(index0, index1)
-    graphs = list(nx.connected_component_subgraphs(nx_g))
-    print len(graphs)
-    for graph in graphs:
-        # nx.draw(graph)
-        # plt.show()
-        print 'MAXIMUM ' + str(len(maximum_independent_set(graph)))
-        print 'MAXIMAL ' + str(len(maximal_independent_set(graph)))
-        graph_compl = nx.complement(graph)
-        print 'MAXIMUM CLIQUE ' + str(len(max_clique(graph_compl)))
-    # print len(maximum_independent_set(nx_g))
-    # print i_g.independence_number()
+    print len(nodes)
+    print datetime.datetime.now()
+    for index0 in range(len(test_graphs)):
+        for index1 in range(index0 + 1, len(test_graphs)):
+            graph0 = set(test_graphs[index0])
+            graph1 = set(test_graphs[index1])
+            intersection = graph0.intersection(graph1)
+    print datetime.datetime.now()
+    #             # if two graphs under indexes have at least one edge in common - draw an edge
+    #             graph0 = set(test_graphs[index0])
+    #             graph1 = set(test_graphs[index1])
+    #             intersection = graph0.intersection(graph1)
+    #             if 0 < len(intersection):
+    #                 # build a edge
+    #                 if (index0, index1) not in edges_set:
+    #                     edges_set.add((index0, index1))
+    #                     # print intersection
+    #                     nx_g.add_edge(index0, index1)
+    #                     i_g.add_edge(index0, index1)
+    # graphs = list(nx.connected_component_subgraphs(nx_g))
+    # print len(graphs)
+    # for graph in graphs:
+    #     # nx.draw(graph)
+    #     # plt.show()
+    #     print 'MAXIMUM ' + str(len(maximum_independent_set(graph)))
+    #     print 'MAXIMAL ' + str(len(maximal_independent_set(graph)))
+    #     graph_compl = nx.complement(graph)
+    #     print 'MAXIMUM CLIQUE ' + str(len(max_clique(graph_compl)))
+    # # print len(maximum_independent_set(nx_g))
+    # # print i_g.independence_number()
 
 
 

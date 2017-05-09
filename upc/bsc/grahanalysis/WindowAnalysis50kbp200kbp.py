@@ -73,37 +73,26 @@ with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/7d734d
 
 # build overlap graph
 nx_g = nx.Graph()
-i_g = ig.Graph()
 nx_g.add_nodes_from(range(len(chromoplexies)))
-i_g.add_vertices(len(chromoplexies))
-edges_set = set()
 for index0 in range(len(chromoplexies)):
     for index1 in range(index0 + 1, len(chromoplexies)):
         # if two graphs under indexes have at least one edge in common - draw an edge
         if index1 == index0 + 1 and index0 % 100 == 0:
             print index0
-        graph0 = set(chromoplexies[index0][1])
-        graph1 = set(chromoplexies[index1][1])
+        graph0 = chromoplexies[index0][1]
+        graph1 = chromoplexies[index1][1]
         intersection = graph0.intersection(graph1)
         if 0 < len(intersection):
             # build a edge
-            if (index0, index1) not in edges_set:
-                edges_set.add((index0, index1))
-                # print intersection
-                nx_g.add_edge(index0, index1)
-                i_g.add_edge(index0, index1)
+            nx_g.add_edge(index0, index1)
+
 graphs = list(nx.connected_component_subgraphs(nx_g))
-graphs_ig = i_g.components().subgraphs()
 print 'Connected components NX: ' + str(len(graphs))
-print 'Connected components IG: ' + str(len(graphs_ig))
+actual_nmb = 0
 for graph in graphs:
-    # nx.draw(graph)
-    # plt.show()
-    print len(maximum_independent_set(graph))
-    print len(maximal_independent_set(graph))
-print '-------------------------'
-for graph in graphs_ig:
-    print graph.alpha()
+    actual_nmb += len(maximum_independent_set(graph))
+
+print actual_nmb
 
 
 # find common edges (2)

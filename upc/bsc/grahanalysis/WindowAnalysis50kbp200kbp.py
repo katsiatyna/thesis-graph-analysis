@@ -33,7 +33,7 @@ CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
            48129895, 51304566, 155270560, 59373566]
 
 # read the file from Luisa and analyze the triangles
-with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/7d734d06-f2b1-4924-a201-620ac8084c49.chromplex.wsinter50000.wsintra200000.csv', 'rb') as chromoplexia_csv:
+with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/7d734d06-f2b1-4924-a201-620ac8084c49.SARC-US.chromplex.wsinter2000.wsintra200000TO14000000.csv', 'rb') as chromoplexia_csv:
     reader = csv.DictReader(chromoplexia_csv, delimiter= '\t',fieldnames=['pos_1', 'pos_2', 'pos_3'])
     # ('6', '6', 42536734, 44191141)	('6', '12', 44191196, 76701650)	('12', '6', 76701958, 42536907)
     chromoplexies = list()
@@ -96,51 +96,50 @@ print actual_nmb
 
 
 # find common edges (2)
-# print len(chromoplexies)
-# mult = dict()
-# for triangle in chromoplexies:
-#     for candidate in chromoplexies:
-#         if triangle[0] != candidate[0]:
-#             intersection = triangle[1].intersection(candidate[1])
-#             if 1 < len(intersection):
-#                 # two edges in common
-#                 intersection_hash = ''
-#                 for tup in intersection:
-#                     intersection_hash += str(tup[0]) + '.' + str(tup[1]) + ';'
-#                 if intersection_hash in mult:
-#                     if triangle not in mult[intersection_hash]:
-#                         mult[intersection_hash].append(triangle)
-#                     if candidate not in mult[intersection_hash]:
-#                         mult[intersection_hash].append(candidate)
-#                 else:
-#                     mult[intersection_hash] = [triangle, candidate]
-# with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/chromoplexies_analysis_50_200.csv', 'wb') as csvfile:
-#         fieldnames = ['common edges', 'duplicate count (graphs - 1)', 'graphs']
-#         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-#         writer.writeheader()
-#         for key in mult.keys():
-#             writer.writerow({'common edges': key, 'duplicate count (graphs - 1)': len(mult[key]) - 1, 'graphs': mult[key]})
-#
-# # find all the unduplicated ones
-# duplicates = list()
-# chromoplexies_unduplicated = list()
-# # pick a representative from each group
-# for key in mult.keys():
-#     i = 0
-#     el = mult[key][i]
-#     while (el in chromoplexies_unduplicated or el in duplicates) and i < len(mult[key]):
-#         el = mult[key][i]
-#         i += 1
-#     if el not in chromoplexies_unduplicated:
-#         chromoplexies_unduplicated.append(el)
-#     # add duplicates
-#     for item in mult[key]:
-#         if item != el:
-#             duplicates.append(item)
-# for item in chromoplexies:
-#     if item not in chromoplexies_unduplicated and item not in duplicates:
-#         chromoplexies_unduplicated.append(item)
-# print len(chromoplexies_unduplicated)
+print len(chromoplexies)
+mult = dict()
+for triangle in chromoplexies:
+    for candidate in chromoplexies:
+        if triangle[0] != candidate[0]:
+            intersection = triangle[1].intersection(candidate[1])
+            if 1 < len(intersection):
+                # two edges in common
+                intersection_hash = ''
+                for tup in intersection:
+                    intersection_hash += str(tup[0]) + '.' + str(tup[1]) + ';'
+                if intersection_hash in mult:
+                    if triangle not in mult[intersection_hash]:
+                        mult[intersection_hash].append(triangle)
+                    if candidate not in mult[intersection_hash]:
+                        mult[intersection_hash].append(candidate)
+                else:
+                    mult[intersection_hash] = [triangle, candidate]
+with open('/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/chromoplexies_analysis_50_200.csv', 'wb') as csvfile:
+        fieldnames = ['common edges', 'duplicate count (graphs - 1)', 'graphs']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for key in mult.keys():
+            writer.writerow({'common edges': key, 'duplicate count (graphs - 1)': len(mult[key]) - 1, 'graphs': mult[key]})
+# find all the unduplicated ones
+duplicates = list()
+chromoplexies_unduplicated = list()
+# pick a representative from each group
+for key in mult.keys():
+    i = 0
+    el = mult[key][i]
+    while (el in chromoplexies_unduplicated or el in duplicates) and i < len(mult[key]):
+        el = mult[key][i]
+        i += 1
+    if el not in chromoplexies_unduplicated:
+        chromoplexies_unduplicated.append(el)
+    # add duplicates
+    for item in mult[key]:
+        if item != el:
+            duplicates.append(item)
+for item in chromoplexies:
+    if item not in chromoplexies_unduplicated and item not in duplicates:
+        chromoplexies_unduplicated.append(item)
+print len(chromoplexies_unduplicated)
 # chromoplexies_unduplicated = sorted(chromoplexies_unduplicated)
 # for chrom in chromoplexies_unduplicated:
 #     print chrom

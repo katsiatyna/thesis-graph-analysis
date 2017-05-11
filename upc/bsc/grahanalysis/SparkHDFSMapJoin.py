@@ -81,8 +81,8 @@ def map_to_graph(combination, edges, positions_list):
         new_edges.append((original_vertices.index(edge[0]), original_vertices.index(edge[1])))
     # v_g = VsigramGraph(g, None, label_arr=canon_label(g), orig_edges=original_edges)
     # subgraph_collection = SubgraphCollection(v_g.label_arr, subgraphs=[v_g], freq=1)
-    # return (canon_label(g), (1, [transform_to_original_edges(original_edges, positions_list)]))
-    return (canon_label(g), (1, [original_edges]))
+    return (canon_label(g), (1, [transform_to_original_edges(original_edges, positions_list)]))
+    #return (canon_label(g), (1, [original_edges]))
 
 
 def fix_frequency(pattern):
@@ -221,5 +221,5 @@ for i in range(2, 4):
     counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
     #print counts_by_label.first()
     # fix the frequency
-    fixed_freq = counts_by_label.map(lambda pattern: fix_frequency(pattern))
-    fixed_freq.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(i))
+    #fixed_freq = counts_by_label.map(lambda pattern: fix_frequency(pattern))
+    counts_by_label.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(i))

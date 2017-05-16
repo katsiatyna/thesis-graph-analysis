@@ -40,40 +40,43 @@ def get_results(client, sample):
                     parts = line.split(',', 1)
                     label_str = parts[0]
                     label_str = label_str[2:len(label_str) - 1].strip()
-                    tuple_freq_list = parts[1].split(',', 1)
-                    freq = int(tuple_freq_list[0][2:])
-                    subgraphs_str = tuple_freq_list[1][0:len(tuple_freq_list[1]) - 3].strip()
-                    subgraphs_list = ast.literal_eval(subgraphs_str)
+                    tail_str = parts[1].strip()
+                    tail = ast.literal_eval(tail_str[0:len(tail_str) - 1])
 
                     if label_str not in results:
                         results[label_str] = dict()
-                        results[label_str]['freq'] = freq
-                        results[label_str]['graphs'] = subgraphs_list
+                        results[label_str]['freq_inter'] = tail[0][0]
+                        results[label_str]['graphs_inter'] = tail[0][1]
+                        results[label_str]['freq_intra'] = tail[1][0]
+                        results[label_str]['graphs_intra'] = tail[1][1]
                     else:
-                        results[label_str]['freq'] += freq
-                        results[label_str]['graphs'].extend(subgraphs_list)
+                        results[label_str]['freq_inter'] += tail[0][0]
+                        results[label_str]['graphs_inter'].extend(tail[0][1])
+                        results[label_str]['freq_intra'] += tail[1][0]
+                        results[label_str]['graphs_intra'].extend(tail[1][1])
             results_all[i] = results
     return results_all
 
 client = Config().get_client('dev')
 samples = ['7d734d06-f2b1-4924-a201-620ac8084c49', '0448206f-3ade-4087-b1a9-4fb2d14e1367', 'ea1cac20-88c1-4257-9cdb-d2890eb2e123']
 for sample in samples:
-    if sample != '7d734d06-f2b1-4924-a201-620ac8084c49':
-        continue
-    results = get_results(client, sample)
-    # build an overlap graph with triangles
-    test_graphs = results[3]['0:  2;  1:  3;  2:  0 3;  3:  1 2;']['graphs']
-    nodes = range(len(test_graphs))
-    nx_g = nx.Graph()
-    nx_g.add_nodes_from(nodes)
-    print len(nodes)
-    print datetime.datetime.now()
-    for index0 in range(len(test_graphs)):
-        for index1 in range(index0 + 1, len(test_graphs)):
-            graph0 = set(test_graphs[index0])
-            graph1 = set(test_graphs[index1])
-            intersection = graph0.intersection(graph1)
-    print datetime.datetime.now()
+    write_init_files(client, sample)
+    # if sample != '7d734d06-f2b1-4924-a201-620ac8084c49':
+    #     continue
+    # results = get_results(client, sample)
+    # # build an overlap graph with triangles
+    # test_graphs = results[3]['0:  2;  1:  3;  2:  0 3;  3:  1 2;']['graphs_inter']
+    # nodes = range(len(test_graphs))
+    # nx_g = nx.Graph()
+    # nx_g.add_nodes_from(nodes)
+    # print len(nodes)
+    # print datetime.datetime.now()
+    # for index0 in range(len(test_graphs)):
+    #     for index1 in range(index0 + 1, len(test_graphs)):
+    #         graph0 = set(test_graphs[index0])
+    #         graph1 = set(test_graphs[index1])
+    #         intersection = graph0.intersection(graph1)
+    # print datetime.datetime.now()
     #             # if two graphs under indexes have at least one edge in common - draw an edge
     #             graph0 = set(test_graphs[index0])
     #             graph1 = set(test_graphs[index1])

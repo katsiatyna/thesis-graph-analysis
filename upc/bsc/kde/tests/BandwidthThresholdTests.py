@@ -1,16 +1,32 @@
 import numpy as np
 from matplotlib import pylab as plt
 from matplotlib import pyplot
-from pyqt_fit import kde, kernels
 import peakutils
 import statsmodels.api as sm
-from sklearn.neighbors import KernelDensity
 import csv
 import sys
-from scipy.signal import argrelextrema
-import scipy
-from pypeaks import Data, Intervals
-from upc.bsc.Constants import SAMPLES, CHR_MAP
+from upc.bsc.Constants import SAMPLES, CHR_MAP, BANDWIDTH_CANDIDATES
+from operator import itemgetter
+import os
+import errno
+from hdfs import Config
+import ast
+
+
+def write_init_files(client, sample, dir_path, bandwidth, threshold_counter):
+    # write the assignment file
+    file_name = sample + '_new_assignment.csv'
+    metrics_file_name = sample + '_metrics.csv'
+    with open(dir_path + file_name,
+              'rw') as csvfile:
+        client.delete('samples/' + sample + '/' + file_name, recursive=True)
+        client.delete('samples/b' + str(int(bandwidth)) + '/' + sample + '/t' + str(threshold_counter) + '/' + file_name, recursive=True)
+        client.write('samples/b' + str(int(bandwidth)) + '/' + sample + '/t' + str(threshold_counter) + '/' + file_name, csvfile)
+    with open(dir_path + metrics_file_name,
+              'rw') as csvfile:
+        client.delete('samples/' + sample + '/' + metrics_file_name, recursive=True)
+        client.delete('samples/b' + str(int(bandwidth)) + '/' + sample + '/t' + str(threshold_counter) + '/' + metrics_file_name, recursive=True)
+        client.write('samples/b' + str(int(bandwidth)) + '/' + sample + '/t' + str(threshold_counter) + '/' + metrics_file_name, csvfile)
 
 
 def chr_number(chr_str):
@@ -92,6 +108,12 @@ def func(x, return_val):
 
 def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv'):
     # write new assignment
+    if not os.path.exists(os.path.dirname(path)):
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as exc: # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
     with open(path, 'w+') as csvfile:
         fieldnames = ['pos_1', 'pos_2']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -102,6 +124,12 @@ def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/
 
 
 def write_circos_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_for_circos.csv'):
+    if not os.path.exists(os.path.dirname(path)):
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as exc: # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
     # write new assignment
     with open(path, 'w+') as csvfile:
         fieldnames = ['source_id','source_breakpoint','target_id','target_breakpoint','source_label','target_label']
@@ -128,6 +156,12 @@ def write_circos_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pa
 
 
 def write_circos_input_file_orig(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_orig_for_circos.csv'):
+    if not os.path.exists(os.path.dirname(path)):
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as exc: # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
     # write new assignment
     with open(path, 'w+') as csvfile:
         fieldnames = ['source_id','source_breakpoint','target_id','target_breakpoint','source_label','target_label']
@@ -149,27 +183,144 @@ def diff(pos, peak):
 def find_closest_peak_fft(pos, support_pos, peak_indexes):
     min_diff = sys.maxint
     new_pos = pos
+    peak_ind = -1
     for peak in peak_indexes:
         if(diff(pos, support_pos[peak]) < min_diff):
             min_diff = diff(pos, support_pos[peak])
             new_pos = support_pos[peak]
-    return new_pos
+            peak_ind = peak
+    return new_pos, peak_ind
 
 
 def construct_new_assignment_fft(original_pos, support_pos, peak_indexes):
     new_assignment_fft = dict()
     for pos in original_pos:
-        new_pos = find_closest_peak_fft(pos, support_pos, peak_indexes)
+        new_pos, peak_index = find_closest_peak_fft(pos, support_pos, peak_indexes)
         new_assignment_fft[pos] = new_pos
     return new_assignment_fft
 
 
+def construct_new_assignment_from_clusters(clusters_dict, threshold):
+    new_assignment_fft = dict()
+    for cluster in clusters_dict:
+        if cluster['density'] > threshold:
+            for member in cluster['members']:
+                new_assignment_fft[member] = cluster['center']
+    return new_assignment_fft
+
+
+def find_closest_support_index(pos, support):
+    min_diff = sys.maxint
+    closest_sup = 0.0
+    for sup in support:
+        if abs(pos - sup) < min_diff:
+            min_diff = abs(pos - sup)
+            closest_sup = sup
+    index = np.where(support == closest_sup)
+    return index[0][0]
+
+
+def construct_clusters(collection_per_chrom, support_per_chrom, density_per_chrom, peak_indexes):
+    # list of {'density':cluster_value, 'center': cluster_center, 'members': [collection of points belonging to it]}
+    clusters = dict()
+    # set of cluster centers
+    for i in range(len(collection_per_chrom)):
+        for pos in collection_per_chrom[i]:
+            cluster_center, peak_index = find_closest_peak_fft(pos, support_per_chrom[i], peak_indexes[i])
+            # special case
+            density = -1.0
+            if peak_index == -1:
+                closest_sup_ind = find_closest_support_index(pos, support_per_chrom[i])
+                density = density_per_chrom[i][closest_sup_ind]
+            else:
+                density = density_per_chrom[i][peak_index]
+            if density not in clusters:
+                clusters[density] = {'density': density, 'center': cluster_center,
+                                'members': [pos]}
+            else:
+                clusters[density]['members'].append(pos)
+    # sort by density
+    clusters_list = list()
+    for key in clusters:
+        clusters_list.append(clusters[key])
+    clusters_list = sorted(clusters_list, key = lambda k: k['density'], reverse=True)
+    return clusters_list
+
+
+def external_edge(pos, orig_edges):
+    # find an edge with this position
+    for edge in orig_edges:
+        if float(edge[0][1]) == pos and edge[0][0] != edge[1][0]:
+            return True
+        if float(edge[1][1]) == pos and edge[1][0] != edge[0][0]:
+            return True
+    return False
+
+
+def internal_edge(pos1, pos2, orig_edges):
+    for edge in orig_edges:
+        if float(edge[0][1]) == pos1 and float(edge[1][1]) == pos2:
+            return True
+        if float(edge[1][1]) == pos1 and float(edge[0][1]) == pos2:
+            return True
+    return False
+
+
+def test_new_assignment_with_correction(assignment, positions_by_chrom, orig_edges, sample, bandwidth, threshold_counter,
+                                        path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/'):
+    #fir the path
+    path += 'b' + str(int(bandwidth)) + '/' + sample + '/t' + str(threshold_counter) + '/' + sample + '_metrics.csv'
+    # reassign from values to keys
+    min_dist_collection = list()
+    max_dist_collection = list()
+    for chrom in positions_by_chrom.keys():
+        min_dist_non_joined = sys.maxint
+        max_dist_joined = -sys.maxint - 1
+        for pos1 in positions_by_chrom[chrom]:
+            for pos2 in positions_by_chrom[chrom]:
+                if pos1 == pos2 or pos1 not in assignment or pos2 not in assignment:
+                    continue
+                # if two positions assigned to the same destination - find out if the distance is bigger than the max
+                if assignment[pos1] == assignment[pos2] \
+                        and external_edge(pos1, orig_edges) \
+                        and external_edge(pos2, orig_edges)\
+                        and abs(pos1 - pos2) > max_dist_joined:
+                    max_dist_joined = abs(pos1 - pos2)
+                else:
+                    # if two positions assigned to different destinations - find out if the distance is smaller than the min
+                    if assignment[pos1] != assignment[pos2] and internal_edge(pos1, pos2, orig_edges)\
+                            and abs(pos1 - pos2) < min_dist_non_joined:
+                        min_dist_non_joined = abs(pos1 - pos2)
+
+        if min_dist_non_joined < sys.maxint:
+            min_dist_collection.append(min_dist_non_joined)
+        if max_dist_joined > -sys.maxint - 1:
+            max_dist_collection.append(max_dist_joined)
+    avg_max_joined = float(sum(max_dist_collection)) / len(max_dist_collection)
+    max_max_joined = max(max_dist_collection)
+    avg_min_non_joined = float(sum(min_dist_collection)) / len(min_dist_collection)
+    min_min_non_joined = min(min_dist_collection)
+    with open(path, 'wb') as csvfile:
+        fieldnames = ['metric', 'value']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow({'metric': 'Inter avg. max. dist.', 'value': avg_max_joined})
+        writer.writerow({'metric': 'Inter max. max. dist.', 'value': max_max_joined})
+        writer.writerow({'metric': 'Intra avg. min. dist.', 'value': avg_min_non_joined})
+        writer.writerow({'metric': 'Intra min. min. dist.', 'value': min_min_non_joined})
+    csvfile.close()
+    print 'Inter Average Max distance between joined: ' + str(avg_max_joined)
+    print 'Inter Max Max distance between joined: ' + str(max_max_joined) + ', chrom: ' + str(max_dist_collection.index(max_max_joined))
+    print 'Intra Average Min distance between non-joined: ' + str(avg_min_non_joined)
+    print 'Intra Min Min distance between non-joined: ' + str(min_min_non_joined) + ', chrom: ' + str(min_dist_collection.index(min_min_non_joined))
+
 
 mode_separate = True
 chrom = 1
-bandwidth_candidates = [500.0, 1000.0, 2000.0, 5000.0, 10000.0, 25000.0, 50000.0, 100000.0, 150000.0]
+
+client = Config().get_client('dev')
 # read the positions from the largest sample
-for bandwidth in bandwidth_candidates:
+for bandwidth in BANDWIDTH_CANDIDATES:
     for sample in SAMPLES:
         edges = load_edges_2d(path= '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/' + sample + '_positions.csv')
         ds_collection = convert_to_2d_array(edges)
@@ -218,29 +369,72 @@ for bandwidth in bandwidth_candidates:
                 index_offset += len(ds)
                 first_chr = False
         plt.figure(num=None, figsize=(25, 15), dpi=80, facecolor='w', edgecolor='k')
-        if mode_separate:
-            plt.plot(X_collection_sup_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
-            plt.plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
-            plt.title('Sample ' + sample + '. Bandwidth = ' + str(bandwidth) + '. Stats FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])))
-        else:
-            plt.plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
-            plt.plot(X_collection, x_plot_y, '+k')
-            plt.title('Sample ' + sample + '. Bandwidth = ' + str(bandwidth) + '. Stats FFT. NmbPeaks = ' + str(len(indexes_collection)))
-        new_assignment = dict()
-        for i in range(len(ds_collection)):
-            new_assignment.update(construct_new_assignment_fft(X_collection_sep[i], X_collection_sup_sep[i],
-                                                               indexes_collection_sep[i]))
-        new_edges = []
-        for edge in edges:
-            new_edges.append((new_assignment[float(edge[0][1])], new_assignment[float(edge[1][1])]))
-        # print new_edges
-        write_undirect_input_file(new_edges,
-                                  path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
-                                       + sample + '/' + sample + '_new_assignment.csv')
-        write_circos_input_file(new_edges,
-                                path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
-                                     + sample + '/' + sample + '_for_circos.csv')
-        # write_circos_input_file_orig(edges,
-        #                              path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
-        #                                   + sample + '/' + sample + '_orig_for_circos.csv')
+        # if mode_separate:
+        #     plt.plot(X_collection_sup_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
+        #     plt.plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
+        #     plt.title('Sample ' + sample + '. Bandwidth = ' + str(bandwidth) + '. Stats FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])))
+        # else:
+        #     plt.plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
+        #     plt.plot(X_collection, x_plot_y, '+k')
+        #     plt.title('Sample ' + sample + '. Bandwidth = ' + str(bandwidth) + '. Stats FFT. NmbPeaks = ' + str(len(indexes_collection)))
+
+        # HERE CONSTRUCT NEW CLUSTERS
+        cluster_assignment = construct_clusters(X_collection_sep, X_collection_sup_sep, dens_collection_sep, indexes_collection_sep)
+        min_density = min(cluster_assignment, key=lambda x: x['density'])['density']
+        max_density = max(cluster_assignment, key=lambda x: x['density'])['density']
+        # print str(min_density * 1000000000), str(max_density * 1000000000)
+        # create thresholds 30%, starting from 0
+        thresholds = []
+        third_of_clusters_nmb = int(round(float(len(cluster_assignment)) / 3.0))
+        third_of_clusters = cluster_assignment[0:third_of_clusters_nmb]
+        thresholds.append(third_of_clusters[len(third_of_clusters) - 1]['density'])
+        third_of_clusters = cluster_assignment[third_of_clusters_nmb:2*third_of_clusters_nmb]
+        thresholds.append(third_of_clusters[len(third_of_clusters) - 1]['density'])
+        thresholds.append(0.0)
+
+        # draw cluster assignment
+        n_groups = len(cluster_assignment)
+        # create plot
+        # fig, ax = plt.subplots()
+        index = np.arange(n_groups)
+        bar_width = 0.5
+        opacity = 0.8
+        rects1 = plt.bar(index, [item['density'] for item in cluster_assignment], bar_width,
+                         alpha=opacity,
+                         color='b',
+                         label='Dens')
+
+        # rects2 = plt.bar(index + bar_width, [len(item['members']) for item in cluster_assignment], bar_width,
+        #                  alpha=opacity,
+        #                  color='g',
+        #                  label='Size')
+        plt.xlabel('Clusters')
+        plt.ylabel('Density')
+        plt.title('B: ' + str(bandwidth) + ', Sample: ' + sample + ', Points: ' + str(len(x_plot_y)) + ', Clusters: ' + str(len(cluster_assignment)))
+        # plt.xticks(index + bar_width, range(len(cluster_assignment)))
+        plt.legend()
+        plt.tight_layout()
         # plt.show()
+
+        counter = 0
+        for threshold in thresholds:
+            new_assignment = construct_new_assignment_from_clusters(cluster_assignment, threshold)
+            new_edges = []
+            for edge in edges:
+                if float(edge[0][1]) in new_assignment and float(edge[1][1]) in new_assignment:
+                    new_edges.append((new_assignment[float(edge[0][1])], new_assignment[float(edge[1][1])]))
+            test_new_assignment_with_correction(new_assignment, ds_collection, edges, sample, bandwidth, counter)
+            # print new_edges
+            write_undirect_input_file(new_edges,
+                                      path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
+                                           + sample + '/t' + str(counter) + '/' + sample + '_new_assignment.csv')
+            write_circos_input_file(new_edges,
+                                    path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
+                                         + sample + '/t' + str(counter) + '/' + sample + '_for_circos.csv')
+            write_init_files(client, sample, '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
+                                           + sample + '/t' + str(counter) + '/', bandwidth, counter)
+            counter += 1
+            # write_circos_input_file_orig(edges,
+            #                              path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
+            #                                   + sample + '/' + sample + '_orig_for_circos.csv')
+            # plt.show()

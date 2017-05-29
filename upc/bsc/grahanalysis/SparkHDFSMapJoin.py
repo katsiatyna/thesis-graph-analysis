@@ -3,12 +3,15 @@
 import os
 import sys
 import csv
+
+import datetime
 import numpy as np
 from pynauty import *
 import re
 import networkx as nx
 from hdfs import Config
 from networkx.algorithms.approximation import maximum_independent_set, max_clique
+from upc.bsc.Constants import SAMPLES, CHR_MAP, BANDWIDTH_CANDIDATES, THRESHOLD_COUNTERS
 
 
 # Set the path for spark installation
@@ -85,10 +88,15 @@ def find_relative_position(position):
             offset += long(CHR_MAP[i])
 
 
-def map_to_graph(combination, edges, positions_list):
+def map_to_graph(combination_with_index, edges, positions_list):
     # edges are list of tuples
 
     # this is going to be the key
+    # print combination_with_index
+    combination = combination_with_index[0]
+    # print 'comb: ' + str(combination)
+    index = combination_with_index[1]
+    # print 'index: ' + str(index)
     original_edges = list()
     if type(combination) is int:
         combination = [combination]
@@ -117,7 +125,13 @@ def map_to_graph(combination, edges, positions_list):
                 chromosomes.add(chrom)
     if len(chromosomes) == 1:
         intra = True
-    return (canon_label(g), ((1, original_graph) if not intra else (0, []), (1, original_graph) if intra else (0, [])))
+    posting_list = dict()
+    for edge in original_graph[0]:
+        # print edge
+        edge_hash = str(edge[0]) + ':' + str(edge[1])
+        posting_list[edge_hash] = [index]
+
+    return (canon_label(g), ((1, posting_list) if not intra else (0, dict()), (1, posting_list) if intra else (0, dict())))
     #return (canon_label(g), (1, [original_edges]))
 
 
@@ -146,7 +160,26 @@ def update_subgraph_freq(a, b):
     # freq_object = SubgraphCollection(label=a.label)
     # freq_object.subgraphs = a.subgraphs + b.subgraphs
     # freq_object.freq = a.freq + b.freq
-    return ((a[0][0]+ b[0][0], a[0][1] + b[0][1]),(a[1][0]+ b[1][0], a[1][1] + b[1][1]))
+    posting_list_1_1 = a[0][1]
+    posting_list_2_1 = b[0][1]
+    # print '1_1 ' + str(posting_list_1_1)
+    # print '2_1 ' + str(posting_list_2_1)
+
+    for key in posting_list_2_1:
+        if key not in posting_list_1_1:
+            posting_list_1_1[key] = posting_list_2_1[key]
+        else:
+            posting_list_1_1[key].extend(posting_list_2_1[key])
+    posting_list_1_2 = a[1][1]
+    posting_list_2_2 = b[1][1]
+    # print '1_2 ' + str(posting_list_1_2)
+    # print '2_2 ' + str(posting_list_2_2)
+    for key in posting_list_2_2:
+        if key not in posting_list_1_2:
+            posting_list_1_2[key] = posting_list_2_2[key]
+        else:
+            posting_list_1_2[key].extend(posting_list_2_2[key])
+    return ((a[0][0]+ b[0][0], posting_list_1_1),(a[1][0]+ b[1][0], posting_list_1_2))
 
 
 def filter_by_connected(edges_indexes, orig_edges):
@@ -201,12 +234,6 @@ def join_connected_edges(combination, original_edges):
     return result_list
 
 
-CHR_MAP = [249250621, 243199373, 198022430, 191154276, 180915260,
-           171115067, 159138663, 146364022, 141213431, 135534747,
-           135006516, 133851895, 115169878, 107349540, 102531392,
-           90354753, 81195210, 78077248, 59128983, 63025520,
-           48129895, 51304566, 155270560, 59373566]
-samples = ['7d734d06-f2b1-4924-a201-620ac8084c49', '0448206f-3ade-4087-b1a9-4fb2d14e1367', 'ea1cac20-88c1-4257-9cdb-d2890eb2e123']
 hdfs_root = 'hdfs://localhost:54310/'
 client = Config().get_client('dev')
 
@@ -216,55 +243,63 @@ sc = SparkContext(conf=conf)
 # load the edges and deduplicate them
 # edges = map_csv_to_edges_list(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv')
 
+for bandwidth in BANDWIDTH_CANDIDATES:
+    for sample in SAMPLES:
+        for threshold_counter in THRESHOLD_COUNTERS:
+            print 'SAMPLE ' + sample
+            # try to read from hdfs
+            print 'Deleting HDFS directory...'
+            client.delete('subgraphs/b' + str(int(bandwidth)) + '/' + sample + '/t' + str(threshold_counter), recursive=True)
 
-for sample in samples:
-    print 'SAMPLE ' + sample
-    # try to read from hdfs
-    print 'Deleting HDFS directory...'
-    client.delete('subgraphs/' + sample, recursive=True)
+            lines = sc.textFile(hdfs_root + 'samples/b' + str(int(bandwidth)) + '/' + sample
+                                + '/t' + str(threshold_counter) + '/' + sample + '_new_assignment.csv')
+            header = lines.first()  # extract header
+            lines = lines.filter(lambda row: row != header)   # filter out header
+            positions_rdd = lines.map(lambda line: line.split(','))
+            # print positions_rdd.collect()
+            positions_combined = lines.flatMap(lambda line: line.split(','))
+            positions_distinct = positions_combined.distinct()
+            positions_distinct_list = positions_distinct.collect()
+            edges_rdd = positions_rdd.map(lambda positions: [positions_distinct_list.index(positions[0])
+                                                             if positions_distinct_list.index(positions[0]) < positions_distinct_list.index(positions[1])
+                                                             else positions_distinct_list.index(positions[1]),
+                                                             positions_distinct_list.index(positions[1])
+                                                             if positions_distinct_list.index(positions[0]) < positions_distinct_list.index(positions[1])
+                                                             else positions_distinct_list.index(positions[0])])
+            edges_rdd = edges_rdd.map(lambda edge: (str(edge[0]) + ':' + str(edge[1]), (edge, 1)))
+            edges_rdd = edges_rdd.reduceByKey(lambda edge_kv1, edge_kv2: (edge_kv1[0], edge_kv1[1] + edge_kv2[1]) )
+            edges_rdd_list = edges_rdd.collect()
+            edges = [tuple(item[1][0]) for item in edges_rdd_list]
+            print len(edges)
+            edges_list = sc.broadcast(edges)
 
-    lines = sc.textFile(hdfs_root + 'samples/' + sample + '/' + sample + '_new_assignment.csv')
-    header = lines.first()  # extract header
-    lines = lines.filter(lambda row: row != header)   # filter out header
-    positions_rdd = lines.map(lambda line: line.split(','))
-    print positions_rdd.collect()
-    positions_combined = lines.flatMap(lambda line: line.split(','))
-    positions_distinct = positions_combined.distinct()
-    positions_distinct_list = positions_distinct.collect()
-    edges_rdd = positions_rdd.map(lambda positions: [positions_distinct_list.index(positions[0])
-                                                     if positions_distinct_list.index(positions[0]) < positions_distinct_list.index(positions[1])
-                                                     else positions_distinct_list.index(positions[1]),
-                                                     positions_distinct_list.index(positions[1])
-                                                     if positions_distinct_list.index(positions[0]) < positions_distinct_list.index(positions[1])
-                                                     else positions_distinct_list.index(positions[0])])
-    edges_rdd = edges_rdd.map(lambda edge: (str(edge[0]) + ':' + str(edge[1]), (edge, 1)))
-    edges_rdd = edges_rdd.reduceByKey(lambda edge_kv1, edge_kv2: (edge_kv1[0], edge_kv1[1] + edge_kv2[1]) )
-    edges_rdd_list = edges_rdd.collect()
-    edges = [tuple(item[1][0]) for item in edges_rdd_list]
-    print len(edges)
-    edges_list = sc.broadcast(edges)
+            rdd_1 = sc.parallelize(range(len(edges)))
+            rdd_with_numbers_1 = rdd_1.zipWithIndex()
+            # print rdd_with_numbers_1.collect()
+            rdd_of_graphs_1 = rdd_with_numbers_1.map(lambda combination: map_to_graph(combination, edges_list, positions_distinct_list))
+            counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+            counts_by_label_1.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(1))
+            rdd_last = rdd_1
 
-    rdd_1 = sc.parallelize(range(len(edges)))
-    rdd_of_graphs_1 = rdd_1.map(lambda combination: map_to_graph(combination, edges_list, positions_distinct_list))
-    counts_by_label_1 = rdd_of_graphs_1.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
-    counts_by_label_1.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(1))
-    rdd_last = rdd_1
-
-    for i in range(2, 4):
-        print 'SIZE ' + str(i)
-        # for each element in rdd_1 create a list and add to new rdd
-        rdd_next = rdd_last.flatMap(lambda combination: join_connected_edges(combination, edges_list))
-        rdd_next = rdd_next.map(lambda combination: map_to_tuple_with_hash(combination))
-        print rdd_next.count()
-        rdd_next = rdd_next.reduceByKey(lambda a, b: a)
-        print rdd_next.count()
-        rdd_next = rdd_next.map(lambda x: x[1])
-        rdd_last = rdd_next
-        # create a graph from each list
-        rdd_of_graphs = rdd_next.map(lambda combination: map_to_graph(combination, edges_list, positions_distinct_list))
-        print rdd_of_graphs.first()
-        counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
-        #print counts_by_label.first()
-        # fix the frequency
-        #fixed_freq = counts_by_label.map(lambda pattern: fix_frequency(pattern))
-        counts_by_label.saveAsTextFile(hdfs_root + 'subgraphs/' + sample + '/' + str(i))
+            for i in range(2, 4):
+                print 'SIZE ' + str(i)
+                # for each element in rdd_1 create a list and add to new rdd
+                print str(datetime.datetime.now()) + 'Generating candidates'
+                rdd_next = rdd_last.flatMap(lambda combination: join_connected_edges(combination, edges_list))
+                rdd_next = rdd_next.map(lambda combination: map_to_tuple_with_hash(combination))
+                print rdd_next.first()
+                print rdd_next.count()
+                rdd_next = rdd_next.reduceByKey(lambda a, b: a)
+                print rdd_next.count()
+                rdd_next = rdd_next.map(lambda x: x[1])
+                rdd_last = rdd_next
+                # create a graph from each list
+                rdd_next_with_index = rdd_next.zipWithIndex()
+                rdd_of_graphs = rdd_next_with_index.map(lambda combination: map_to_graph(combination, edges_list, positions_distinct_list))
+                print rdd_of_graphs.first()
+                counts_by_label = rdd_of_graphs.reduceByKey(lambda a, b: update_subgraph_freq(a, b))
+                #print counts_by_label.first()
+                # fix the frequency
+                #fixed_freq = counts_by_label.map(lambda pattern: fix_frequency(pattern))
+                counts_by_label.saveAsTextFile(hdfs_root + 'subgraphs/b' + str(int(bandwidth)) + '/' + sample
+                                               + '/t' + str(threshold_counter) + '/' + str(i))

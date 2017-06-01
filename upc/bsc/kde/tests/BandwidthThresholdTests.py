@@ -1,3 +1,4 @@
+import happybase
 import numpy as np
 from matplotlib import pylab as plt
 from matplotlib import pyplot
@@ -5,7 +6,7 @@ import peakutils
 import statsmodels.api as sm
 import csv
 import sys
-from upc.bsc.Constants import SAMPLES, CHR_MAP, BANDWIDTH_CANDIDATES
+from upc.bsc.Constants import SAMPLES, CHR_MAP, BANDWIDTH_CANDIDATES, SAMPLE_CANCER
 from operator import itemgetter
 import os
 import errno
@@ -61,12 +62,12 @@ def find_absolute_position(position, chromosome):
     return offset + long(position)
 
 
-def find_relative_position(position):
+def find_relative_position(position, chrom_as_str=True):
     # index = chr_number(chromosome)
     offset = 0L
     for i in range(len(CHR_MAP) + 1):
         if offset < position < offset + long(CHR_MAP[i]):
-            chrom_str = chr_str(i)
+            chrom_str = chr_str(i) if chrom_as_str else i
             pos = position - offset
             return chrom_str, pos
         else:
@@ -107,7 +108,7 @@ def func(x, return_val):
 
 
 def write_undirect_input_file(assignment, path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv'):
-    # write new assignment
+
     if not os.path.exists(os.path.dirname(path)):
         try:
             os.makedirs(os.path.dirname(path))
@@ -296,11 +297,25 @@ def test_new_assignment_with_correction(assignment, positions_by_chrom, orig_edg
             min_dist_collection.append(min_dist_non_joined)
         if max_dist_joined > -sys.maxint - 1:
             max_dist_collection.append(max_dist_joined)
-    avg_max_joined = float(sum(max_dist_collection)) / len(max_dist_collection)
-    max_max_joined = max(max_dist_collection)
-    avg_min_non_joined = float(sum(min_dist_collection)) / len(min_dist_collection)
-    min_min_non_joined = min(min_dist_collection)
-    with open(path, 'wb') as csvfile:
+    if len(max_dist_collection) > 0:
+        avg_max_joined = float(sum(max_dist_collection)) / len(max_dist_collection)
+        max_max_joined = max(max_dist_collection)
+    else:
+        avg_max_joined = None
+        max_max_joined = None
+    if len(min_dist_collection) > 0:
+        avg_min_non_joined = float(sum(min_dist_collection)) / len(min_dist_collection)
+        min_min_non_joined = min(min_dist_collection)
+    else:
+        avg_min_non_joined = None
+        min_min_non_joined = None
+    if not os.path.exists(os.path.dirname(path)):
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as exc: # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+    with open(path, 'w+') as csvfile:
         fieldnames = ['metric', 'value']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -309,10 +324,47 @@ def test_new_assignment_with_correction(assignment, positions_by_chrom, orig_edg
         writer.writerow({'metric': 'Intra avg. min. dist.', 'value': avg_min_non_joined})
         writer.writerow({'metric': 'Intra min. min. dist.', 'value': min_min_non_joined})
     csvfile.close()
-    print 'Inter Average Max distance between joined: ' + str(avg_max_joined)
-    print 'Inter Max Max distance between joined: ' + str(max_max_joined) + ', chrom: ' + str(max_dist_collection.index(max_max_joined))
-    print 'Intra Average Min distance between non-joined: ' + str(avg_min_non_joined)
-    print 'Intra Min Min distance between non-joined: ' + str(min_min_non_joined) + ', chrom: ' + str(min_dist_collection.index(min_min_non_joined))
+    metrics_dict_list = []
+    metrics_dict_list.append({'metric': 'Inter avg. max. dist.', 'value': avg_max_joined})
+    metrics_dict_list.append({'metric': 'Inter max. max. dist.', 'value': max_max_joined})
+    metrics_dict_list.append({'metric': 'Intra avg. min. dist.', 'value': avg_min_non_joined})
+    metrics_dict_list.append({'metric': 'Intra min. min. dist.', 'value': min_min_non_joined})
+    # print 'Inter Average Max distance between joined: ' + str(avg_max_joined)
+    # print 'Inter Max Max distance between joined: ' + str(max_max_joined) + ', chrom: ' + str(max_dist_collection.index(max_max_joined))
+    # print 'Intra Average Min distance between non-joined: ' + str(avg_min_non_joined)
+    # print 'Intra Min Min distance between non-joined: ' + str(min_min_non_joined) + ', chrom: ' + str(min_dist_collection.index(min_min_non_joined))
+    return metrics_dict_list
+
+
+def write_data_to_hbase(new_edges, metrics, bandwidth, threshold_counter, threshold, sample):
+    # write new assignment
+    connection = happybase.Connection()
+    sample_data_table = connection.table('sample_data')
+    # create row_key
+    row_key = 'b' + str(int(bandwidth)) + 't' + str(threshold_counter) + 's' + sample
+    # collect values
+    values = {b's:name': sample.encode('utf-8'), b's:cancer': SAMPLE_CANCER[sample].encode('utf-8'),
+              b'b:value': str(int(bandwidth)).encode('utf-8'),
+              b't:counter': str(threshold_counter).encode('utf-8'), b't:value': str(threshold).encode('utf-8')}
+    for metric in metrics:
+        values[('m:' + metric['metric']).encode('utf-8')] = str(metric['value']).encode('utf-8')
+    chr1 = []
+    pos1 = []
+    chr2 = []
+    pos2 = []
+    for edge in new_edges:
+        chrom, pos = find_relative_position(edge[0], False)
+        chr1.append(chrom)
+        pos1.append(pos)
+        chrom, pos = find_relative_position(edge[1], False)
+        chr2.append(chrom)
+        pos2.append(pos)
+    values[b'd:chr1'] = str(chr1).encode('utf-8')
+    values[b'd:pos1'] = str(pos1).encode('utf-8')
+    values[b'd:chr2'] = str(chr2).encode('utf-8')
+    values[b'd:pos2'] = str(pos2).encode('utf-8')
+    # print values
+    sample_data_table.put(row_key.encode('utf-8'), values)
 
 
 mode_separate = True
@@ -320,8 +372,12 @@ chrom = 1
 
 client = Config().get_client('dev')
 # read the positions from the largest sample
+
+
+
 for bandwidth in BANDWIDTH_CANDIDATES:
     for sample in SAMPLES:
+        print 'BANDWIDTH: ' + str(int(bandwidth)) + ', SAMPLE: ' + sample
         edges = load_edges_2d(path= '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/' + sample + '_positions.csv')
         ds_collection = convert_to_2d_array(edges)
         chromosome_list = list(chromosome for chromosome in ds_collection.keys())
@@ -399,10 +455,10 @@ for bandwidth in BANDWIDTH_CANDIDATES:
         index = np.arange(n_groups)
         bar_width = 0.5
         opacity = 0.8
-        rects1 = plt.bar(index, [item['density'] for item in cluster_assignment], bar_width,
-                         alpha=opacity,
-                         color='b',
-                         label='Dens')
+        # rects1 = plt.bar(index, [item['density'] for item in cluster_assignment], bar_width,
+        #                  alpha=opacity,
+        #                  color='b',
+        #                  label='Dens')
 
         # rects2 = plt.bar(index + bar_width, [len(item['members']) for item in cluster_assignment], bar_width,
         #                  alpha=opacity,
@@ -423,8 +479,9 @@ for bandwidth in BANDWIDTH_CANDIDATES:
             for edge in edges:
                 if float(edge[0][1]) in new_assignment and float(edge[1][1]) in new_assignment:
                     new_edges.append((new_assignment[float(edge[0][1])], new_assignment[float(edge[1][1])]))
-            test_new_assignment_with_correction(new_assignment, ds_collection, edges, sample, bandwidth, counter)
+            metrics = test_new_assignment_with_correction(new_assignment, ds_collection, edges, sample, bandwidth, counter)
             # print new_edges
+            write_data_to_hbase(new_edges, metrics, bandwidth, counter, threshold, sample)
             write_undirect_input_file(new_edges,
                                       path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
                                            + sample + '/t' + str(counter) + '/' + sample + '_new_assignment.csv')

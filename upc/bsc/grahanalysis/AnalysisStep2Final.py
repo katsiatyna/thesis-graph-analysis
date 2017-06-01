@@ -13,7 +13,7 @@ import re
 import networkx as nx
 from hdfs import Config
 from networkx.algorithms.approximation import maximum_independent_set, max_clique
-from upc.bsc.Constants import SAMPLES, CHR_MAP, BANDWIDTH_CANDIDATES, THRESHOLD_COUNTERS
+from upc.bsc.Constants import SAMPLES, CHR_MAP, BANDWIDTH_CANDIDATES, THRESHOLD_COUNTERS, SAMPLE_CANCER
 
 
 # Set the path for spark installation
@@ -286,9 +286,9 @@ def save_to_hbase(record, bandwidth, threshold_counter, sample, size):
     connection = happybase.Connection()
     sample_pattern_table = connection.table('sample_pattern')
     # create row_key
-    row_key = 'b' + str(int(bandwidth)) + 't' + str(threshold_counter) + 's' + sample + 'r' + record[0].strip()
+    row_key = 'b' + str(int(bandwidth)) + 't' + str(threshold_counter) + 's' + sample + 'p' + record[0].strip()
     # collect values
-    values = {b's:name': sample.encode('utf-8'), b's:cancer': b'unknown',
+    values = {b's:name': sample.encode('utf-8'), b's:cancer': SAMPLE_CANCER[sample].encode('utf-8'),
               b'p:code': record[0].strip().encode('utf-8'), b'p:size': str(size).encode('utf-8'),
               b'p:parent': '0' if size == 1 else find_generating_parent(record[0]).encode('utf-8'),
               b'b:value': str(int(bandwidth)).encode('utf-8'),

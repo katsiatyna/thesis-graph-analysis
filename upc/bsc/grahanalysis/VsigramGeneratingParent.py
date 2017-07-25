@@ -2,10 +2,13 @@ import datetime
 from pynauty import *
 import networkx as nx
 import csv
-from upc.bsc.grahanalysis.model.VsigramGraph import VsigramGraph
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+
+from upc.bsc.grahanalysis.VsigramGraph import VsigramGraph
 
 
-def map_csv_to_graph(path='/home/kkrasnas/Documents/thesis/pattern_mining/new_assignment.csv'):
+def map_csv_to_graph(path='/home/kkrasnas/Documents/thesis/pattern_mining/validation_data/new_assignment_separate.csv'):
     with open(path, 'rb') as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=['pos_1', 'pos_2'])
         next(csvfile)
@@ -48,7 +51,7 @@ def get_subgraph_hash(edges):
     return hash_str
 
 
-def vsigram(G, minFreq):
+def vsigram(G, min_freq, max_size):
     MCLf = dict()
     MCLf1 = dict()
     for edge in G.edges:
@@ -73,7 +76,7 @@ def vsigram(G, minFreq):
     for key in MCLf1.keys():
         # M(clf1) =  all subgraphs with canonical label clf1
         # remove an element from dictionary if number of subgraphs < minFreq
-        if len(MCLf1[key]) < minFreq:
+        if len(MCLf1[key]) < min_freq:
             #remove from frequent labels and frequent subgraphs
             del MCLf1[key]
         else:
@@ -85,7 +88,7 @@ def vsigram(G, minFreq):
     # for each clf1 in CLf1 do
     for clf1 in MCLf1.keys():
         # CLf = CLf + vsigram_exten(clf1, G, minFreq)
-        MCLf.update(vsigram_extend(clf1, MCLf1[clf1], G, minFreq, MCLf, 1+1))
+        MCLf.update(vsigram_extend(clf1, MCLf1[clf1], G, min_freq, MCLf, 1 + 1, max_size))
     # end for
     # FINALLY CHECK ALL FREQUENCIES
     # print 'Starting to eliminate keys'
@@ -144,7 +147,9 @@ def generating_parent(c_child, c_parent):
     return label == c_parent
 
 
-def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
+def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size, max_size):
+    if size > max_size:
+        return MCLf
     #print 'Processing size ' + str(size)
     # Sk+1 = NULL
     Skplus1 = set()
@@ -191,12 +196,12 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
     # for each clk+1 in CLk+1 do
     for clkplus1 in MCLkplus1.keys():
         # if clfk is not the generating parent of clk+1 then
-        print 'frequency of ' + clkplus1 + ' is ' + str(len(MCLkplus1[clkplus1]))
+        # print 'frequency of ' + clkplus1 + ' is ' + str(len(MCLkplus1[clkplus1]))
         if not generating_parent(clkplus1, clfk):  # generating parent function
-            print 'size: ' + str(size) + ', ' + clkplus1 + ' is NOT a child of ' + clfk
+            # print 'size: ' + str(size) + ', ' + clkplus1 + ' is NOT a child of ' + clfk
             continue
         # end if
-        print 'size: ' + str(size) + ', ' + clkplus1 + ' is a child of ' + clfk
+        # print 'size: ' + str(size) + ', ' + clkplus1 + ' is a child of ' + clfk
         # compute clk+1.freq from M(clk+1)
         # if clk+1.freq < minFreq then
 
@@ -208,19 +213,43 @@ def vsigram_extend(clfk, Mclfk, G, minFreq, MCLf, size):
             MCLf[clkplus1] = MCLkplus1[clkplus1]
         else:
             MCLf[clkplus1].append(MCLkplus1[clkplus1])
-        MCLf.update(vsigram_extend(clkplus1, MCLkplus1[clkplus1], G, minFreq, MCLf, size+1))
+        MCLf.update(vsigram_extend(clkplus1, MCLkplus1[clkplus1], G, minFreq, MCLf, size+1, max_size))
     # end for
     # print 'Done with size ' + str(size)
     return MCLf
 
-start_time = datetime.datetime.now()
-print 'Start time is:' + str(start_time)
-graph = map_csv_to_graph()
-frequent_subgraphs = vsigram(graph, 1)
-end_time = datetime.datetime.now()
-print 'End time is:' + str(end_time)
-print 'Elapsed: ' + str(end_time - start_time)
-print len(frequent_subgraphs)
+sizes = [1, 2, 3, 4]
+milliseconds_per_size = []
+milliseconds = []
+for i in sizes:
+    start_time = datetime.datetime.now()
+    print 'Start time is:' + str(start_time)
+    graph = map_csv_to_graph()
+    frequent_subgraphs = vsigram(graph, 1, i)
+    end_time = datetime.datetime.now()
+    elapsed = end_time - start_time
+    print 'End time is:' + str(end_time)
 
-for pattern in frequent_subgraphs.keys():
-    print pattern + ': ' + str(len(frequent_subgraphs[pattern])) + ', edges: ' + str(len(frequent_subgraphs[pattern][0].edges))
+    print 'Elapsed: ' + str(elapsed) + ' ' + str(elapsed.total_seconds() * 1000)
+    milisec = elapsed.total_seconds() * 1000
+
+    milliseconds_per_size.append(milisec - milliseconds[len(milliseconds) - 1] if len(milliseconds) > 0 else 0)
+    milliseconds.append(milisec)
+    #print len(frequent_subgraphs)
+
+    for pattern in frequent_subgraphs.keys():
+        print pattern + ': ' + str(len(frequent_subgraphs[pattern])) + ', edges: ' + str(len(frequent_subgraphs[pattern][0].edges))
+
+print milliseconds
+print milliseconds_per_size
+ # create plot
+# plt.yscale('log')
+ax = plt.figure().gca()
+ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+ax.plot(sizes, milliseconds_per_size, 'bD', sizes, milliseconds_per_size, 'b')
+ax.xaxis.set_label_text('Size of patterns')
+ax.yaxis.set_label_text('Time (ms)')
+##ax.xlabel('Size of patterns')
+##ax.ylabel('Time (ms)')
+plt.show()
+

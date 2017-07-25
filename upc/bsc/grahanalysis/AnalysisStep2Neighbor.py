@@ -277,6 +277,82 @@ def join_connected_edges_gen_parent(combination, original_edges):
     return result_list
 
 
+def join_connected_edges_gen_parent_neighbor(combination, original_edges, graph):
+    edges_indexes_list = list(combination) if type(combination) is list else [combination]
+    result_list = []
+    combination_edges = []
+    vertices_set = set()
+
+    for edge_index in edges_indexes_list:
+        edge_current = original_edges.value[edge_index]
+        combination_edges.append(edge_current)
+        vertices_set.add(edge_current[0])
+        vertices_set.add(edge_current[1])
+
+    vertices_list = list(vertices_set)
+    #parent canonical
+    g = Graph(len(vertices_list))
+    for edge in combination_edges:
+        g.connect_vertex(vertices_list.index(edge[0]), vertices_list.index(edge[1]))
+    c_parent = canon_label(g)
+    #print vertices_set
+    candidate_edges = set()
+    for vertex in vertices_set:
+        neighbors = graph[vertex].keys()
+        for neighbor in neighbors:
+            candidate_edge = (vertex, neighbor) if vertex < neighbor else (neighbor, vertex)
+            if candidate_edge not in combination_edges:
+                candidate_edges.add(candidate_edge)
+    #print candidate_edges
+    #print len(candidate_edges)
+
+    for edge in candidate_edges:
+            new_list = edges_indexes_list + [original_edges.value.index(edge)]
+            new_edges = combination_edges + [edge]
+            new_vertices = vertices_set.copy()
+            new_vertices.add(edge[0])
+            new_vertices.add(edge[1])
+            new_vertices_list = list(new_vertices)
+            g_child = Graph(len(new_vertices_list))
+            for edge_child in new_edges:
+                g_child.connect_vertex(new_vertices_list.index(edge_child[0]), new_vertices_list.index(edge_child[1]))
+            c_child = canon_label(g_child)
+            if generating_parent(c_child, c_parent):
+                # print new_list
+                result_list.append(new_list)
+    # print 'LISTS: ' + str(result_list)
+    return result_list
+
+
+def join_connected_edges_neighbor(combination, original_edges, whole_graph_value):
+    edges_indexes_list = list(combination) if type(combination) is list else [combination]
+    result_list = []
+    combination_edges = []
+    vertices_set = set()
+
+    for edge_index in edges_indexes_list:
+        edge_current = original_edges.value[edge_index]
+        combination_edges.append(edge_current)
+        vertices_set.add(edge_current[0])
+        vertices_set.add(edge_current[1])
+
+    #print vertices_set
+    candidate_edges = set()
+    for vertex in vertices_set:
+        neighbors = whole_graph_value[vertex].keys()
+        for neighbor in neighbors:
+            candidate_edge = (vertex, neighbor) if vertex < neighbor else (neighbor, vertex)
+            if candidate_edge not in combination_edges:
+                candidate_edges.add(candidate_edge)
+    #print candidate_edges
+    #print len(candidate_edges)
+
+    for edge in candidate_edges:
+            new_list = edges_indexes_list + [original_edges.value.index(edge)]
+            result_list.append(new_list)
+    # print 'LISTS: ' + str(result_list)
+    return result_list
+
 
 def find_generating_parent(c_child):
     edges = list()
@@ -393,6 +469,12 @@ for bandwidth in BANDWIDTH_CANDIDATES:
             edges_rdd_list = edges_rdd.collect()
             edges = [tuple(item[1][0]) for item in edges_rdd_list]
             edges_list = sc.broadcast(edges)
+            # create nx graph from edges
+            nx_g = nx.Graph()
+            nx_g.add_nodes_from(range(len(positions_distinct_list)))
+            nx_g.add_edges_from(edges)
+            whole_graph = sc.broadcast(nx_g)
+
 
             rdd_1 = sc.parallelize(range(len(edges)))
             rdd_with_numbers_1 = rdd_1.zipWithIndex()
@@ -407,7 +489,7 @@ for bandwidth in BANDWIDTH_CANDIDATES:
             for i in range(2, 5):
                 print 'SIZE ' + str(i)
                 # for each element in rdd_1 create a list and add to new rdd
-                rdd_next = rdd_last.flatMap(lambda combination: join_connected_edges_gen_parent(combination, edges_list))
+                rdd_next = rdd_last.flatMap(lambda combination: join_connected_edges_neighbor(combination, edges_list, whole_graph.value))
                 rdd_next = rdd_next.map(lambda combination: map_to_tuple_with_hash(combination))
                 # print rdd_next.first()
                 print 'Before deduplication ' + str(rdd_next.count())

@@ -14,7 +14,6 @@ from hdfs import Config
 import ast
 import networkx as nx
 
-
 def write_init_files(client, sample, dir_path, bandwidth, threshold_counter):
     # write the assignment file
     file_name = sample + '_new_assignment.csv'
@@ -238,7 +237,7 @@ def construct_clusters(collection_per_chrom, support_per_chrom, density_per_chro
                 density = density_per_chrom[i][peak_index]
             if density not in clusters:
                 clusters[density] = {'density': density, 'center': cluster_center,
-                                'members': [pos]}
+                                'members': [pos], 'chromosome': i}
             else:
                 clusters[density]['members'].append(pos)
     # sort by density
@@ -337,7 +336,7 @@ def test_new_assignment_with_correction(assignment, positions_by_chrom, orig_edg
     return metrics_dict_list
 
 
-def write_data_to_hbase(new_edges, num_edges, num_loops, coeff_simple, coeff_loops, metrics, bandwidth, threshold_counter, threshold, sample):
+def write_data_to_hbase(new_edges, metrics, bandwidth, threshold_counter, threshold, sample):
     # write new assignment
     connection = happybase.Connection()
     sample_data_table = connection.table('sample_data')
@@ -349,10 +348,6 @@ def write_data_to_hbase(new_edges, num_edges, num_loops, coeff_simple, coeff_loo
               b't:counter': str(threshold_counter).encode('utf-8'), b't:value': str(threshold).encode('utf-8')}
     for metric in metrics:
         values[('m:' + metric['metric']).encode('utf-8')] = str(metric['value']).encode('utf-8')
-    values[b'm:Number of Edges'] = str(num_edges).encode('utf-8')
-    values[b'm:Number of Self-Loops'] = str(num_loops).encode('utf-8')
-    values[b'm:Clustering Coeff.'] = str(coeff_simple).encode('utf-8')
-    values[b'm:Clustering Coeff. with Loops'] = str(coeff_loops).encode('utf-8')
     chr1 = []
     pos1 = []
     chr2 = []
@@ -372,10 +367,23 @@ def write_data_to_hbase(new_edges, num_edges, num_loops, coeff_simple, coeff_loo
     # print values
     sample_data_table.put(row_key.encode('utf-8'), values)
 
-def calc_clustering_coeff_simple(new_edges):
+
+mode_separate = True
+chrom = 8
+
+client = Config().get_client('dev')
+# read the positions from the largest sample
+
+
+def calc_clustering_coeff_simple(new_edges, numedges_no_loops):
     nx_g = nx.Graph()
     nx_g.add_edges_from(new_edges)
     print len(list(nx_g.edges()))
+    E = float(numedges_no_loops)
+    V = float(len(list(nx_g.nodes())))
+    density = (2 * E)/( V * (V - 1) )
+    print 'density', density
+    print 'coeff', density * len(list(nx_g.edges()))
     coeff_total = 0.0
     for vertex in list(nx_g.nodes()):
         neighbors = nx_g[vertex].keys()
@@ -396,13 +404,13 @@ def calc_clustering_coeff_simple(new_edges):
         coeff_total += coeff
     coeff_total /= len(list(nx_g.nodes()))
     print 'coeff simple', coeff_total
-    return coeff_total
+    return coeff_total, density
 
 
 def calc_clustering_coeff_loops(new_edges):
     nx_g = nx.Graph()
     nx_g.add_edges_from(new_edges)
-    print len(list(nx_g.edges()))
+    #print len(list(nx_g.edges()))
     coeff_total = 0.0
     for vertex in list(nx_g.nodes()):
         neighbors = nx_g[vertex].keys()
@@ -424,15 +432,19 @@ def calc_clustering_coeff_loops(new_edges):
     return coeff_total
 
 
-mode_separate = True
-chrom = 1
+def calc_max_pattern_size(new_edges):
+    g = nx.Graph()
+    g.add_edges_from(new_edges)
+    conn_comp = nx.connected_component_subgraphs(g)
+    max_comp = max(conn_comp, key=lambda graph: len(list(graph.edges())))
+    print 'MAX CONN COMP', len(list(max_comp.edges()))
 
-client = Config().get_client('dev')
-# read the positions from the largest sample
 
-
-for bandwidth in BANDWIDTH_CANDIDATES:
-    for sample in SAMPLES:
+for bandwidth in [50000, 150000]:#BANDWIDTH_CANDIDATES:
+    for sample in ['ec4d4cbc-d5d1-418d-a292-cad9576624fd']:#, '0448206f-3ade-4087-b1a9-4fb2d14e1367']:
+        #['1ac15380-04a2-42dd-8ade-28556a570e80', '931b24da-5d6d-4c2d-8de9-ef32d6eb8565', '4c59fb2d-21b6-4b09-8174-6102de736e4d', '45e16b70-c3ec-493e-86d1-505ffdf5056c', 'bc0dee07-de20-44d6-be65-05af7e63ac96', 'a85cf239-ff51-46e7-9b88-4c2cb49c66b9', 'f83fc777-5416-c3e9-e040-11ac0d482c8e','a92023de-5c97-4bf2-aa3c-0e768d7c5ece', 'b27d75ba-5989-4200-bfe9-f1b7d7cf8008', '35c797fd-ca81-4cef-b6c4-7e3776f661b3',
+                  # '9880c3c9-5685-42a7-8fe9-7585ea1a1d37', 'a67f4531-99ef-43df-82f5-f6abc4b11826', 'ea1cac20-88c1-4257-9cdb-d2890eb2e123', '9c681cd9-25fb-42ac-aa6b-bb962882fa22', '8ea666b7-2b6e-4df8-9a9d-b8265b9749b4', 'cdbbd701-9c05-4f9e-923d-06039dd8a04d', 'b38d0777-4901-48b8-9cdc-33b7f13a424f','ec4d4cbc-d5d1-418d-a292-cad9576624fd', '0448206f-3ade-4087-b1a9-4fb2d14e1367']:
+            #['9880c3c9-5685-42a7-8fe9-7585ea1a1d37', 'a67f4531-99ef-43df-82f5-f6abc4b11826', 'ea1cac20-88c1-4257-9cdb-d2890eb2e123', '9c681cd9-25fb-42ac-aa6b-bb962882fa22', '8ea666b7-2b6e-4df8-9a9d-b8265b9749b4', 'cdbbd701-9c05-4f9e-923d-06039dd8a04d', 'b38d0777-4901-48b8-9cdc-33b7f13a424f','ec4d4cbc-d5d1-418d-a292-cad9576624fd', '0448206f-3ade-4087-b1a9-4fb2d14e1367']:# ['ec4d4cbc-d5d1-418d-a292-cad9576624fd','0448206f-3ade-4087-b1a9-4fb2d14e1367']:#SAMPLES:
         print 'BANDWIDTH: ' + str(int(bandwidth)) + ', SAMPLE: ' + sample
         edges = load_edges_2d(path= '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/' + sample + '/' + sample + '_positions.csv')
         ds_collection = convert_to_2d_array(edges)
@@ -475,27 +487,28 @@ for bandwidth in BANDWIDTH_CANDIDATES:
                 indexes_stats_fft = peakutils.indexes(dens_stats_fft.density, thres=0.0, min_dist=0)
                 # indexes_stats_fft = scipy.signal.find_peaks_cwt(dens_stats_fft.density, np.arange(0.001, 2))
                 indexes_collection_sep.append(indexes_stats_fft)
-                # print 'Chromosome ' + str(i) + ': ' + str(len(indexes_stats_fft)) + ' out of ' + str(len(ds)) + ' positions'
+                #print 'Chromosome ' + str(i) + ': ' + str(len(indexes_stats_fft)) + ' out of ' + str(len(ds)) + ' positions'
                 for index in indexes_stats_fft:
                     indexes_collection.append(index_offset + index)
                 index_offset += len(ds)
                 first_chr = False
-        # plt.figure(num=None, figsize=(25, 15), dpi=80, facecolor='w', edgecolor='k')
-        # if mode_separate:
-        #     plt.plot(X_collection_sup_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
-        #     plt.plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
-        #     plt.title('Sample ' + sample + '. Bandwidth = ' + str(bandwidth) + '. Stats FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])))
-        # else:
-        #     plt.plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
-        #     plt.plot(X_collection, x_plot_y, '+k')
-        #     plt.title('Sample ' + sample + '. Bandwidth = ' + str(bandwidth) + '. Stats FFT. NmbPeaks = ' + str(len(indexes_collection)))
+        plt.figure(num=None, figsize=(25, 15), dpi=80, facecolor='w', edgecolor='k')
+        if mode_separate:
+            plt.plot(X_collection_sup_sep[chrom], dens_collection_sep[chrom], '-h', markevery=indexes_collection_sep[chrom])
+            plt.plot(X_collection_sep[chrom], x_plot_y_sep[chrom], '+k')
+            # plt.title('Sample ' + sample + '. Bandwidth = ' + str(bandwidth) + '. Stats FFT. NmbPeaks = ' + str(len(indexes_collection_sep[chrom])))
+        else:
+            plt.plot(X_collection_sup, dens_collection, '-h', markevery=indexes_collection)
+            plt.plot(X_collection, x_plot_y, '+k')
+            # plt.title('Sample ' + sample + '. Bandwidth = ' + str(bandwidth) + '. Stats FFT. NmbPeaks = ' + str(len(indexes_collection)))
 
         # HERE CONSTRUCT NEW CLUSTERS
         cluster_assignment = construct_clusters(X_collection_sep, X_collection_sup_sep, dens_collection_sep, indexes_collection_sep)
+        #print len(cluster_assignment)#, cluster_assignment
         min_density = min(cluster_assignment, key=lambda x: x['density'])['density']
         max_density = max(cluster_assignment, key=lambda x: x['density'])['density']
-        # print str(min_density * 1000000000), str(max_density * 1000000000)
-        # create thresholds 30%, starting from 0
+        # # print str(min_density * 1000000000), str(max_density * 1000000000)
+        # # create thresholds 30%, starting from 0
         thresholds = []
         third_of_clusters_nmb = int(round(float(len(cluster_assignment)) / 3.0))
         third_of_clusters = cluster_assignment[0:third_of_clusters_nmb]
@@ -530,28 +543,35 @@ for bandwidth in BANDWIDTH_CANDIDATES:
 
         counter = 0
         for threshold in thresholds:
-            new_assignment = construct_new_assignment_from_clusters(cluster_assignment, threshold)
-            new_edges = []
-            for edge in edges:
-                if float(edge[0][1]) in new_assignment and float(edge[1][1]) in new_assignment:
-                    new_edges.append((new_assignment[float(edge[0][1])], new_assignment[float(edge[1][1])]))
-            metrics = test_new_assignment_with_correction(new_assignment, ds_collection, edges, sample, bandwidth, counter)
-            coeff_simple = calc_clustering_coeff_simple(new_edges)
-            coeff_loops = calc_clustering_coeff_loops(new_edges)
-            num_edges = len(set(new_edges))
-            num_loops = len([edge for edge in set(new_edges) if edge[0] == edge[1]])
-            # print new_edges
-            write_data_to_hbase(new_edges, num_edges, num_loops, coeff_simple, coeff_loops, metrics, bandwidth, counter, threshold, sample)
-            write_undirect_input_file(new_edges,
-                                      path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
-                                           + sample + '/t' + str(counter) + '/' + sample + '_new_assignment.csv')
-            write_circos_input_file(new_edges,
-                                    path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
-                                         + sample + '/t' + str(counter) + '/' + sample + '_for_circos.csv')
-            write_init_files(client, sample, '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
-                                           + sample + '/t' + str(counter) + '/', bandwidth, counter)
-            counter += 1
-            # write_circos_input_file_orig(edges,
+            if threshold == 0.0:
+                print 'Threshold', threshold
+                new_assignment = construct_new_assignment_from_clusters(cluster_assignment, threshold)
+                new_edges = []
+                for edge in edges:
+                    if float(edge[0][1]) in new_assignment and float(edge[1][1]) in new_assignment:
+                        new_edges.append((new_assignment[float(edge[0][1])], new_assignment[float(edge[1][1])]))
+            # construct networkx graph
+
+                num_edges = len(set(new_edges))
+                print 'num_edges', num_edges
+                num_loops = len([edge for edge in set(new_edges) if edge[0] == edge[1]])
+                print 'num_loops', num_loops
+                calc_clustering_coeff_simple(new_edges, num_edges - num_loops)
+                calc_clustering_coeff_loops(new_edges)
+                calc_max_pattern_size(new_edges)
+            #  metrics = test_new_assignment_with_correction(new_assignment, ds_collection, edges, sample, bandwidth, counter)
+        #     # print new_edges
+        #     write_data_to_hbase(new_edges, metrics, bandwidth, counter, threshold, sample)
+        #     write_undirect_input_file(new_edges,
+        #                               path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
+        #                                    + sample + '/t' + str(counter) + '/' + sample + '_new_assignment.csv')
+        #     write_circos_input_file(new_edges,
+        #                             path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
+        #                                  + sample + '/t' + str(counter) + '/' + sample + '_for_circos.csv')
+        #     write_init_files(client, sample, '/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
+        #                                    + sample + '/t' + str(counter) + '/', bandwidth, counter)
+        #     counter += 1
+        #     # write_circos_input_file_orig(edges,
             #                              path='/home/kkrasnas/Documents/thesis/pattern_mining/candidates/b' + str(int(bandwidth)) + '/'
             #                                   + sample + '/' + sample + '_orig_for_circos.csv')
-            # plt.show()
+        plt.show()

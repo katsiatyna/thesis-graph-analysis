@@ -104,7 +104,7 @@ def read_sample_data():
     connection.close()
 
 
-# recreate_sample_pattern_table()
+#recreate_sample_pattern_table()
 # read_data()
-# recreate_sample_data_table()
-read_sample_data()
+#recreate_sample_data_table()
+#read_sample_data()
